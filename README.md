@@ -81,3 +81,6 @@ Project ACE
 - Matplotlib
 - Jira (project tracking)
 - Overleaf (documentation)
+- librarirs
+    ultralytics 
+    
