@@ -38,7 +38,16 @@ ace-vicon/
 ├── requirements.txt
 ├── README.md
 ├── .gitignore
-└── setup.md
+├── setup.md
+│
+│
+├── plotting/
+├── markers/
+│ ├── serve1/
+│ ├── unmarked/
+├── load_data.py/
+├── plot.py/
+├── requirements.txt/
 
 ---
 
@@ -47,6 +56,11 @@ ace-vicon/
 1. Follow instructions in `setup.md`
 2. Activate your virtual environment
 3. From the project root, run:
+
+## How To Run Plot
+
+1. cd .\plotting\
+2. python plot.py
 
 ---
 

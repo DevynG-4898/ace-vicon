@@ -5,3 +5,4 @@ uploads/
 static/plot.png
 webapp/data/max_serves/
 *.csv
+!plotting/markers/**/*.csv
