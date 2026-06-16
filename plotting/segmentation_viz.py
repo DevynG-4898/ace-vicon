@@ -23,6 +23,10 @@ from serve_segmentation import (  # noqa: E402
     PHASE_COLORS,
     PHASE_NAMES,
     VIEW_OPTIONS,
+    V2_EVENT_LABELS,
+    V2_EVENT_NAMES,
+    V2_PHASE_NAMES,
+    SegmentationConfig,
     SegmentationResult,
     phase_at_index,
     phase_to_index_range,
@@ -49,6 +53,37 @@ from skeleton_viz import (  # noqa: E402
 )
 
 OUTPUT_ROOT = Path(__file__).resolve().parent / "segmentation_validation"
+
+V2_VIEW_OPTIONS = ("Full Serve",) + V2_PHASE_NAMES
+
+
+def segment_for_viz(markers: dict) -> SegmentationResult:
+    """Biomechanics-first segmentation for visualization."""
+    return segment_serve(markers, SegmentationConfig(use_legacy_detection=False))
+
+
+def _phase_names(result: SegmentationResult) -> tuple[str, ...]:
+    return V2_PHASE_NAMES if result.schema_version == 2 else PHASE_NAMES
+
+
+def _event_names(result: SegmentationResult) -> tuple[str, ...]:
+    return V2_EVENT_NAMES if result.schema_version == 2 else EVENT_NAMES
+
+
+def _event_label(result: SegmentationResult, key: str) -> str:
+    if result.schema_version == 2:
+        return V2_EVENT_LABELS[key]
+    return EVENT_LABELS[key]
+
+
+def _view_options(result: SegmentationResult) -> tuple[str, ...]:
+    return V2_VIEW_OPTIONS if result.schema_version == 2 else VIEW_OPTIONS
+
+
+def _phase_color(name: str) -> str:
+    if name == "Deceleration_Finish":
+        return PHASE_COLORS["Deceleration"]
+    return PHASE_COLORS[name]
 
 
 def segmentation_to_dict(serve_name: str, result: SegmentationResult) -> dict[str, Any]:
@@ -88,7 +123,7 @@ def plot_timeline(
     y_event = 0.22
     bar_h = 0.35
 
-    for name in PHASE_NAMES:
+    for name in _phase_names(result):
         start_v, end_v = result.phases[name]
         left = (start_v - t0) / span
         width = max((end_v - start_v + 1) / span, 0.002)
@@ -97,7 +132,7 @@ def plot_timeline(
             width,
             left=left,
             height=bar_h,
-            color=PHASE_COLORS[name],
+            color=_phase_color(name),
             edgecolor="white",
             linewidth=0.5,
         )
@@ -113,13 +148,13 @@ def plot_timeline(
                 fontweight="bold",
             )
 
-    event_colors = plt.colormaps["Dark2"].resampled(len(EVENT_NAMES))
-    for i, key in enumerate(EVENT_NAMES):
+    event_colors = plt.colormaps["Dark2"].resampled(len(_event_names(result)))
+    for i, key in enumerate(_event_names(result)):
         vf = result.events[key]
         x = (vf - t0) / span
         ax.axvline(x, color=event_colors(i), linestyle="--", linewidth=1, alpha=0.85)
         ax.plot(x, y_event, "v", color=event_colors(i), markersize=8)
-        label = EVENT_LABELS[key]
+        label = _event_label(result, key)
         conf = result.event_confidence.get(key, 0.0)
         txt = f"{label}\nF{vf}"
         if show_confidence:
@@ -141,7 +176,7 @@ def plot_timeline(
     ax.set_xlabel("Normalized trial timeline (Vicon frames)")
     ax.set_title(f"{serve_name} — Serve phase timeline & detected events")
     phase_legend = [
-        Patch(facecolor=PHASE_COLORS[n], label=n.replace("_", " ")) for n in PHASE_NAMES
+        Patch(facecolor=_phase_color(n), label=n.replace("_", " ")) for n in _phase_names(result)
     ]
     ax.legend(handles=phase_legend, loc="upper right", fontsize=6, ncol=2, framealpha=0.9)
     fig.tight_layout()
@@ -180,7 +215,7 @@ def plot_debug_signals(
         ax_i.plot(frames, series, color=color, linewidth=1.2)
         ax_i.set_ylabel(title, fontsize=9)
         ax_i.grid(True, alpha=0.3)
-        for key in EVENT_NAMES:
+        for key in _event_names(result):
             idx = result.event_indices[key]
             vf = int(frames[idx])
             ax_i.axvline(vf, color="crimson", linestyle="--", linewidth=1.2, alpha=0.7)
@@ -188,7 +223,7 @@ def plot_debug_signals(
                 ax_i.text(
                     vf,
                     ax_i.get_ylim()[1],
-                    EVENT_LABELS[key].split()[0],
+                    _event_label(result, key).split()[0],
                     rotation=90,
                     va="top",
                     ha="right",
@@ -345,7 +380,7 @@ def run_interactive_viewer(
     serve_dir = Path(serve_dir)
     serve_name = serve_name or serve_dir.name
     markers = load_serve_from_dir(str(serve_dir))
-    result = segment_serve(markers)
+    result = segment_for_viz(markers)
 
     fig = plt.figure(figsize=(13, 10))
     gs = fig.add_gridspec(2, 2, width_ratios=[3, 1], height_ratios=[1, 0.25], hspace=0.3, wspace=0.2)
@@ -459,7 +494,7 @@ def run_interactive_viewer(
             start_animation()
 
     fig.canvas.mpl_connect("key_press_event", on_key)
-    radio = RadioButtons(ax_radio, VIEW_OPTIONS, active=0)
+    radio = RadioButtons(ax_radio, _view_options(result), active=0)
     radio.on_clicked(on_select)
 
     start_animation()
@@ -485,7 +520,7 @@ def generate_serve_validation_assets(
     out.mkdir(parents=True, exist_ok=True)
 
     markers = load_serve_from_dir(str(serve_dir))
-    result = segment_serve(markers)
+    result = segment_for_viz(markers)
     paths: dict[str, Path] = {}
 
     json_path = out / "segmentation.json"
@@ -505,7 +540,7 @@ def generate_serve_validation_assets(
     paths["debug"] = db_path
 
     if save_gifs:
-        for view in VIEW_OPTIONS:
+        for view in _view_options(result):
             safe = view.replace(" ", "_")
             eff_speed = speed if speed > 1 else resolve_view_speed(view, cli_speed=None)
             export_fps, export_stride = gif_fps_and_stride(
@@ -526,14 +561,14 @@ def generate_serve_validation_assets(
 
     summary_path = out / "phase_summary.txt"
     lines = [f"Serve: {serve_name}", ""]
-    for name in PHASE_NAMES:
+    for name in _phase_names(result):
         a, b = result.phases[name]
         lines.append(f"{name}: Vicon frames {a}-{b}  ({b - a + 1} frames)")
     lines.append("")
     lines.append("Events:")
-    for key in EVENT_NAMES:
+    for key in _event_names(result):
         lines.append(
-            f"  {EVENT_LABELS[key]}: frame {result.events[key]}  conf={result.event_confidence[key]:.2f}"
+            f"  {_event_label(result, key)}: frame {result.events[key]}  conf={result.event_confidence[key]:.2f}"
         )
     summary_path.write_text("\n".join(lines), encoding="utf-8")
     paths["summary"] = summary_path
