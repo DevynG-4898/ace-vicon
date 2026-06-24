@@ -42,3 +42,10 @@ python src/main.py
 - Always activate the virtual environment before running code.
 - Do NOT commit the `.venv` folder.
 - Raw Vicon CSV files should go in `data/raw/`.
+
+
+
+python -m mediapipe_pose.tennis_video_analysis mediapipe_pose/tennis_clip_1.mp4
+ python -m mediapipe_pose.tennis_video_analysis mediapipe_pose/tennis_clip_1.mp4
+
+ python -m mediapipe_pose.pose_estimation.py mediapipe_pose/tennis_serve.jpg
