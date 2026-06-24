@@ -189,8 +189,7 @@
       <div class="page-banner">
         <h1 class="page-title">ANALYSE YOUR SERVE</h1>
         <p class="page-sub">
-          Upload your Vicon CSV file and compare your serve to our reference
-          model.
+          Upload your serve to serve like your favorite player.
         </p>
       </div>
 
@@ -205,12 +204,13 @@
               type="file"
               name="media"
               id="fileInput"
-              accept=".csv"
+              accept="video/*"
+              accept="file"
               required
             />
             <div class="upload-icon">⬆️</div>
-            <h3>UPLOAD CSV FILE</h3>
-            <p>Upload your Vicon motion capture data (.csv)</p>
+            <h3>UPLOAD YOUR SERVE VIDEO</h3>
+            <p>Upload your serve video to get detailed feedback</p>
           </div>
 
           <div class="selected-name" id="selectedName"></div>
@@ -221,8 +221,7 @@
 
           <div class="reference-box">
             <strong>Reference Model:</strong><br />
-            Your serve will be compared against a model built from multiple
-            recorded serves of Max using Vicon motion capture.
+            Your serve will be compared against your selected player.
           </div>
         </div>
       </form>

@@ -34,7 +34,7 @@
 
       .card {
         background: #0f1318;
-        border: 1px solid #1e2530;
+        border: 1px solid #141b17;
         border-radius: 12px;
         padding: 1.5rem;
         margin-top: 1.5rem;
@@ -91,10 +91,11 @@
       </div>
 
       <!-- ACTIONS -->
-      <div style="margin-top: 2rem">
-        <a href="{{ url_for('analyse') }}">Analyse Another</a> |
-        <a href="{{ url_for('myprogress') }}">My Progress</a>
-      </div>
+      <!-- ACTIONS -->
+    <div style="margin-top: 2rem">
+      <a href="{{ url_for('analyse') }}" style="color: #ffffff; text-decoration: none;">Analyse Another</a> 
+      <span style="color: #5a6470;"> | </span>
+      <a href="{{ url_for('myprogress') }}" style="color: #fbfbfb; text-decoration: none;">My Progress</a>
     </div>
   </body>
 </html>
