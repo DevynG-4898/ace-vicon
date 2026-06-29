@@ -1,8 +1,9 @@
-venv/
-__pycache__/
-*.pyc
-uploads/
-static/plot.png
+webapp/.env
+webapp/venv/
+webapp/__pycache__/
+webapp/*.pyc
+webapp/uploads/
+webapp/static/plot.png
 webapp/data/max_serves/
 *.csv
 !plotting/markers/**/*.csv
