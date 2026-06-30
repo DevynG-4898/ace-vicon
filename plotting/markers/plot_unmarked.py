@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+import matplotlib.widgets as widgets
 import numpy as np
 import os
 from load_unmarked import load_unmarked_csv
@@ -21,51 +22,30 @@ bones = [
     ("right_hip", "right_knee"),
 ]
 
-csv_path = os.path.join(
-    os.path.dirname(__file__), "..", "unmarked_edited", "serve2.csv"
-)
+csv_path = os.path.join(os.path.dirname(__file__), "multi", "1.csv")
 data = load_unmarked_csv(csv_path)
 
 marker_names = [k for k in data if k != "frames"]
 n_frames = len(data["frames"])
 print("Loaded marker names:", marker_names)
 
-# Marker unique colors and CSV columns (0-indexed):
-#   col 0 = frame number, col 1 = sub-frame (ignored)
-#   each marker occupies 3 consecutive cols: TX, TY, TZ
-#
-#   #   Marker           Color                  CSV cols (TX / TY / TZ)
-#   1.  head             #1f77b4  (blue)        2 / 3 / 4
-#   2.  left_shoulder    #ff7f0e  (orange)      5 / 6 / 7
-#   3.  right_elbow      #2ca02c  (green)       8 / 9 / 10
-#   4.  left_elbow       #d62728  (red)         11 / 12 / 13
-#   5.  chest            #9467bd  (purple)      14 / 15 / 16
-#   6.  left_hand        #8c564b  (brown)       17 / 18 / 19
-#   7.  right_shoulder   #e377c2  (pink)        20 / 21 / 22
-#   8.  left_knee        #7f7f7f  (gray)        23 / 24 / 25
-#   9.  right_knee       #bcbd22  (olive)       26 / 27 / 28
-#   10. right_hand       #17becf  (cyan)        29 / 30 / 31
-#   11. right_hip        #f7b733  (gold)        32 / 33 / 34
-#   12. left_foot        #00c957  (spring green)35 / 36 / 37
-#   13. left_hip         #6a0dad  (indigo)      38 / 39 / 40
-
 MARKER_COLORS = {
     "head": "#1f77b4",
-    "left_shoulder": "#ff7f0e",
-    "right_elbow": "#2ca02c",
-    "left_elbow": "#d62728",
-    "chest": "#9467bd",
-    "left_hand": "#8c564b",
-    "right_shoulder": "#e377c2",
-    "left_knee": "#7f7f7f",
-    "right_knee": "#bcbd22",
-    "right_hand": "#17becf",
-    "right_hip": "#f7b733",
-    "left_foot": "#00c957",
-    "left_hip": "#6a0dad",
+    "chest": "#ff7f0e",
+    "left_shoulder": "#2ca02c",
+    "right_shoulder": "#d62728",
+    "left_elbow": "#9467bd",
+    "right_elbow": "#8c564b",
+    "left_hand": "#e377c2",
+    "right_hand": "#7f7f7f",
+    "left_hip": "#bcbd22",
+    "right_hip": "#17becf",
+    "left_knee": "#f7b733",
+    "right_knee": "#00c957",
+    "left_foot": "#6a0dad",
+    "right_foot": "#961233",
 }
 
-# Axis limits from all frames across all markers
 all_x = np.concatenate([data[m]["TX"] for m in marker_names])
 all_y = np.concatenate([data[m]["TY"] for m in marker_names])
 all_z = np.concatenate([data[m]["TZ"] for m in marker_names])
@@ -85,8 +65,29 @@ x_range = x_lim[1] - x_lim[0]
 y_range = y_lim[1] - y_lim[0]
 z_range = z_lim[1] - z_lim[0]
 
-fig = plt.figure()
+legend_handles = [
+    plt.Line2D(
+        [0], [0], marker="o", color="w", markerfacecolor=color, markersize=8, label=name
+    )
+    for name, color in MARKER_COLORS.items()
+]
+
+fig = plt.figure(figsize=(10, 8))
+# Reserve bottom space for slider and button
+fig.subplots_adjust(bottom=0.2)
 ax = fig.add_subplot(111, projection="3d")
+
+# Slider: occupies most of the bottom strip
+ax_slider = fig.add_axes([0.15, 0.08, 0.65, 0.03])
+frame_slider = widgets.Slider(ax_slider, "Frame", 0, n_frames - 1, valinit=0, valstep=1)
+
+# Pause/Play button to the right of the slider
+ax_button = fig.add_axes([0.82, 0.05, 0.1, 0.075])
+pause_button = widgets.Button(ax_button, "Pause")
+
+is_paused = [False]
+current_frame = [0]
+slider_dragging = [False]
 
 
 def apply_axes():
@@ -99,12 +100,11 @@ def apply_axes():
     ax.set_zlabel("Z")
 
 
-def update(frame_idx):
+def draw_frame(frame_idx):
     ax.cla()
     apply_axes()
     ax.set_title(f'Frame {int(data["frames"][frame_idx])}')
 
-    # Draw markers
     for name in marker_names:
         x = data[name]["TX"][frame_idx]
         y = data[name]["TY"][frame_idx]
@@ -112,7 +112,14 @@ def update(frame_idx):
         if not (np.isnan(x) or np.isnan(y) or np.isnan(z)):
             ax.scatter(x, y, z, s=20, color=MARKER_COLORS.get(name, "#000000"))
 
-    # Draw bones
+    ax.legend(
+        handles=legend_handles,
+        loc="upper left",
+        bbox_to_anchor=(1.05, 1),
+        fontsize=8,
+        framealpha=0.7,
+    )
+
     for start, end in bones:
         if start not in data or end not in data:
             continue
@@ -131,8 +138,51 @@ def update(frame_idx):
         ax.plot([x0, x1], [y0, y1], [z0, z1], "b-", linewidth=1.5)
 
 
+def update(frame_idx):
+    if slider_dragging[0]:
+        return
+    current_frame[0] = frame_idx
+    draw_frame(frame_idx)
+    # Sync slider without triggering on_slider_change
+    frame_slider.eventson = False
+    frame_slider.set_val(frame_idx)
+    frame_slider.eventson = True
+
+
+def on_pause(_):
+    if is_paused[0]:
+        ani.event_source.start()
+        pause_button.label.set_text("Pause")
+        is_paused[0] = False
+    else:
+        ani.event_source.stop()
+        pause_button.label.set_text("Play")
+        is_paused[0] = True
+    fig.canvas.draw_idle()
+
+
+def on_slider_change(_):
+    frame_idx = int(frame_slider.val)
+    current_frame[0] = frame_idx
+    draw_frame(frame_idx)
+    fig.canvas.draw_idle()
+
+
+def on_slider_press(_):
+    slider_dragging[0] = True
+
+
+def on_slider_release(_):
+    slider_dragging[0] = False
+    on_slider_change(frame_slider.val)
+
+
+pause_button.on_clicked(on_pause)
+frame_slider.on_changed(on_slider_change)
+frame_slider.ax.figure.canvas.mpl_connect("button_press_event", on_slider_press)
+frame_slider.ax.figure.canvas.mpl_connect("button_release_event", on_slider_release)
+
 apply_axes()
 ani = animation.FuncAnimation(fig, update, frames=n_frames, interval=33, repeat=True)
 
-plt.tight_layout()
 plt.show()

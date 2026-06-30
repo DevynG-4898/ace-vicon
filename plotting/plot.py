@@ -81,7 +81,7 @@ y_range = y_lim[1] - y_lim[0]
 z_range = z_lim[1] - z_lim[0]
 
 # Milliseconds between frames — lower = faster (16), higher = slower (33 ≈ 30 fps)
-INTERVAL_MS = 33
+INTERVAL_MS = 16
 
 cmap = plt.cm.get_cmap("tab20", len(marker_names))
 marker_colors = {name: cmap(i) for i, name in enumerate(sorted(marker_names))}

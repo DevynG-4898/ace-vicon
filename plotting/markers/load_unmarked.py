@@ -1,4 +1,21 @@
+import importlib.util
+import os
 import pandas as pd
+
+
+def _load_marker_order(csv_path):
+    """Load MARKER_ORDER from the matching <stem>_order.py next to the CSV."""
+    stem = os.path.splitext(os.path.basename(csv_path))[0]
+    order_path = os.path.join(os.path.dirname(csv_path), f"{stem}_order.py")
+    if not os.path.exists(order_path):
+        raise FileNotFoundError(
+            f"No order file found for '{os.path.basename(csv_path)}'. "
+            f"Expected: {order_path}"
+        )
+    spec = importlib.util.spec_from_file_location("_order", order_path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.MARKER_ORDER
 
 
 def load_unmarked_csv(filepath):
@@ -12,46 +29,31 @@ def load_unmarked_csv(filepath):
       Row 3+: data — col 0 = frame, col 1 = sub frame (ignored),
                then groups of 3 columns = TX, TY, TZ per marker
 
-    Returns a dict:
+    Anatomical label order is read from a sidecar file next to the CSV,
+    e.g. multi/1.csv → multi/1_order.py (defines MARKER_ORDER list).
+
+    Returns a dict keyed by anatomical body-part name:
       {
-        'frames': np.ndarray of frame numbers,
-        '<marker_name>': {'TX': np.ndarray, 'TY': np.ndarray, 'TZ': np.ndarray},
+        'frames': np.ndarray,
+        'head': {'TX': np.ndarray, 'TY': np.ndarray, 'TZ': np.ndarray},
+        'chest': {...},
         ...
       }
     """
+    anatomical_labels = _load_marker_order(filepath)
+
     raw = pd.read_csv(filepath, header=None, dtype=str)
 
-    # Anatomical labels in marker order (1-indexed positions)
-    anatomical_labels = [
-        "head",  # Marker 1
-        "left_shoulder",  # Marker 2
-        "right_elbow",  # Marker 3
-        "left_elbow",  # Marker 4
-        "chest",  # Marker 5
-        "left_hand",  # Marker 6
-        "right_shoulder",  # Marker 7
-        "left_knee",  # Marker 8
-        "right_knee",  # Marker 9
-        "right_hand",  # Marker 10
-        "right_hip",  # Marker 11
-        "left_foot",  # Marker 12
-        "left_hip",  # Marker 13
-    ]
-
-    # Extract marker names from row 0 (col 2, 5, 8, ... — every 3rd col)
     n_cols = raw.shape[1]
     n_markers = (n_cols - 2) // 3
     marker_names = []
     for i in range(n_markers):
         if i < len(anatomical_labels):
-            name = anatomical_labels[i]
+            marker_names.append(anatomical_labels[i])
         else:
-            name = f"Marker_{i + 1}"
-        marker_names.append(name)
+            marker_names.append(f"unknown_{i + 1}")
 
-    # Skip the 3 header rows; remaining rows are data
     data = raw.iloc[3:].reset_index(drop=True)
-
     frames = pd.to_numeric(data.iloc[:, 0], errors="coerce").values
 
     result = {"frames": frames}
