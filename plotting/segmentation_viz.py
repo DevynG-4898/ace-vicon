@@ -17,7 +17,7 @@ _SRC_DIR = Path(__file__).resolve().parent.parent / "src"
 if str(_SRC_DIR) not in sys.path:
     sys.path.insert(0, str(_SRC_DIR))
 
-from serve_segmentation import (  # noqa: E402
+from segmentation import (  # noqa: E402
     EVENT_LABELS,
     EVENT_NAMES,
     PHASE_COLORS,

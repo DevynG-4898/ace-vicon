@@ -4,3 +4,5 @@ matplotlib
 pillow
 scipy
 pytest
+opencv-python
+mediapipe

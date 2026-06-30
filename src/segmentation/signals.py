@@ -342,17 +342,3 @@ def argmax_in_range(series: np.ndarray, low: int, high: int, mode: str = "max") 
         return low + int(np.nanargmax(segment))
     return low + int(np.nanargmin(segment))
 
-
-# Aliases for legacy internal imports
-_marker_names = marker_names
-_clip_index = clip_index
-_persist_above = persist_above
-_persist_below = persist_below
-_argmax_in_range = argmax_in_range
-_position = position
-_smooth = smooth
-_speed = speed
-_angle_at_joint = angle_at_joint
-_shoulder_external_rotation_proxy = shoulder_external_rotation_proxy
-_body_velocity = body_velocity
-_compute_signals = compute_legacy_signals

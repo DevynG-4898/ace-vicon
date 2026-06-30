@@ -240,13 +240,6 @@ def detect_all_annotations(
     return AnchorResult(indices=indices, meta=ann_meta)
 
 
-def detect_all_anchors(
-    signals: dict, cfg: SegmentationConfig, n: int
-) -> AnchorResult:
-    """Backward-compatible alias; returns annotations only."""
-    return detect_all_annotations(signals, cfg, n)
-
-
 def resolve_anchor_order(
     events: dict[str, int], cfg: SegmentationConfig, n_frames: int
 ) -> dict[str, int]:
