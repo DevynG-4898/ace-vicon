@@ -1,3 +1,6 @@
 pandas
 numpy
 matplotlib
+pillow
+scipy
+pytest
