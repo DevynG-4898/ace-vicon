@@ -1,73 +1,97 @@
 # ACE – Vicon Tennis Serve Analysis
 
-ACE is a motion capture–based tennis serve analysis system. It compares a user's serve to a reference player and provides quantitative feedback to help improve serve mechanics.
+ACE is a motion capture–based tennis serve analysis system built using Vicon.  
+The system compares a user's serve to a reference player and provides quantitative feedback to help the user match the model’s motion.
 
-## Pipelines
+---
 
-### Video → 3D skeleton (MotionBERT)
+## Project Overview
 
-```text
-2d_video/*.mp4 → MediaPipe → MotionBERT → SkeletonSequence → normalization → FeatureSequence
-```
+This project uses Vicon motion capture data to:
 
-Entry point: `src/motionbert/run_pipeline.py`
+- Record a reference tennis serve
+- Record a user serve
+- Load and process 3D motion data
+- Compute motion metrics
+- Compare user motion against a reference model
 
-See [docs/motionbert_pipeline.md](docs/motionbert_pipeline.md), [docs/skeleton_pipeline.md](docs/skeleton_pipeline.md), and [docs/feature_pipeline.md](docs/feature_pipeline.md).
+The long-term goal is to provide actionable feedback for improving serve mechanics.
 
-Optional full-body mesh output is available through MotionBERT's native `infer_wild_mesh.py` script (see MotionBERT upstream docs).
+---
 
-### Vicon marker segmentation
+## Repository Structure
 
-Entry point: `python -m segmentation` (from `src/` on `PYTHONPATH`, or via project venv)
-
-Plotting tools live under `plotting/`.
-
-## Setup
-
-1. Follow [setup.md](setup.md)
-2. Activate the virtual environment
-3. Run pipelines from the project root
-
-## Quick start
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-pip install -r requirements-motionbert.txt
-
-# Process videos in 2d_video/ and open the viewer
-python src/motionbert/run_pipeline.py --view
-
-# Vicon marker segmentation CLI
-PYTHONPATH=src python -m segmentation --v2 --frames firstserve
-```
-
-## Repository structure
-
-```text
-.
-├── 2d_video/              Input serve videos
-├── docs/                  Usage documentation
-├── dtw/                   Vicon DTW reference motion
-├── external/              MotionBERT checkout
-├── generated_motionbert/  Pipeline outputs
-├── plotting/              Vicon marker data and visualization
+ace-vicon/
+│
+├── data/
+│ ├── raw/
+│ └── processed/
+│
 ├── src/
-│   ├── features/          FeatureSequence extraction
-│   ├── motionbert/        Video pose pipeline
-│   ├── segmentation/      Serve phase segmentation
-│   └── skeleton/          SkeletonSequence and normalization
+│ ├── data/
+│ ├── analysis/ (will be added later)
+│ ├── visualization/ (will be added later)
+│ └── main.py
+│
 ├── tests/
-└── webapp/                Flask CSV similarity prototype
-```
+├── docs/
+├── requirements.txt
+├── README.md
+├── .gitignore
+├── setup.md
+│
+│
+├── plotting/
+├── markers/
+│ ├── serve1/
+│ ├── unmarked/
+├── load_data.py/
+├── plot.py/
+├── requirements.txt/
 
-## Tests
+---
 
-```bash
-python -m pytest
-```
+## How To Run
+
+1. Follow instructions in `setup.md`
+2. Activate your virtual environment
+3. From the project root, run:
+
+## How To Run Plot
+
+1. cd .\plotting\
+2. python plot.py
+
+---
+
+## Current Sprint Goal
+
+Sprint 1 focuses on:
+
+- Recording reference serve data
+- Exporting Vicon CSV files
+- Building a working data loader
+
+---
 
 ## Team
 
-Project ACE — Allison Turnbow, Max Gavin, Biplav Adhikari, Devyn Gayle, Maximiliano Barajas, Jaime Favela
+Project ACE
+
+- Allison Turnbow
+- Max Gavin
+- Biplav Adhikari
+- Devyn Gayle
+- Maximiliano Barajas
+- Jaime Favela
+
+---
+
+## Tools
+
+- Vicon Motion Capture
+- Python
+- Pandas / NumPy
+- Matplotlib
+- Jira (project tracking)
+- Overleaf (documentation)
