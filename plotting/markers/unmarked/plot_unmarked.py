@@ -4,7 +4,6 @@ import numpy as np
 import os
 from load_unmarked import load_unmarked_csv
 
-
 bones = [
     ("head", "chest"),
     ("chest", "left_shoulder"),
@@ -30,6 +29,41 @@ data = load_unmarked_csv(csv_path)
 marker_names = [k for k in data if k != "frames"]
 n_frames = len(data["frames"])
 print("Loaded marker names:", marker_names)
+
+# Marker unique colors and CSV columns (0-indexed):
+#   col 0 = frame number, col 1 = sub-frame (ignored)
+#   each marker occupies 3 consecutive cols: TX, TY, TZ
+#
+#   #   Marker           Color                  CSV cols (TX / TY / TZ)
+#   1.  head             #1f77b4  (blue)        2 / 3 / 4
+#   2.  left_shoulder    #ff7f0e  (orange)      5 / 6 / 7
+#   3.  right_elbow      #2ca02c  (green)       8 / 9 / 10
+#   4.  left_elbow       #d62728  (red)         11 / 12 / 13
+#   5.  chest            #9467bd  (purple)      14 / 15 / 16
+#   6.  left_hand        #8c564b  (brown)       17 / 18 / 19
+#   7.  right_shoulder   #e377c2  (pink)        20 / 21 / 22
+#   8.  left_knee        #7f7f7f  (gray)        23 / 24 / 25
+#   9.  right_knee       #bcbd22  (olive)       26 / 27 / 28
+#   10. right_hand       #17becf  (cyan)        29 / 30 / 31
+#   11. right_hip        #f7b733  (gold)        32 / 33 / 34
+#   12. left_foot        #00c957  (spring green)35 / 36 / 37
+#   13. left_hip         #6a0dad  (indigo)      38 / 39 / 40
+
+MARKER_COLORS = {
+    "head": "#1f77b4",
+    "left_shoulder": "#ff7f0e",
+    "right_elbow": "#2ca02c",
+    "left_elbow": "#d62728",
+    "chest": "#9467bd",
+    "left_hand": "#8c564b",
+    "right_shoulder": "#e377c2",
+    "left_knee": "#7f7f7f",
+    "right_knee": "#bcbd22",
+    "right_hand": "#17becf",
+    "right_hip": "#f7b733",
+    "left_foot": "#00c957",
+    "left_hip": "#6a0dad",
+}
 
 # Axis limits from all frames across all markers
 all_x = np.concatenate([data[m]["TX"] for m in marker_names])
@@ -76,7 +110,7 @@ def update(frame_idx):
         y = data[name]["TY"][frame_idx]
         z = data[name]["TZ"][frame_idx]
         if not (np.isnan(x) or np.isnan(y) or np.isnan(z)):
-            ax.scatter(x, y, z, s=20)
+            ax.scatter(x, y, z, s=20, color=MARKER_COLORS.get(name, "#000000"))
 
     # Draw bones
     for start, end in bones:

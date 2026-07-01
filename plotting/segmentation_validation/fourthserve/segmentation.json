@@ -1,0 +1,65 @@
+{
+  "serve": "fourthserve",
+  "phases": {
+    "Start_Stance": [
+      1,
+      162
+    ],
+    "Release": [
+      163,
+      444
+    ],
+    "Loading": [
+      445,
+      494
+    ],
+    "Cocking": [
+      495,
+      611
+    ],
+    "Acceleration": [
+      612,
+      616
+    ],
+    "Contact": [
+      617,
+      617
+    ],
+    "Deceleration": [
+      618,
+      626
+    ],
+    "Finish": [
+      627,
+      776
+    ]
+  },
+  "events": {
+    "first_movement": 163,
+    "peak_hand_height": 445,
+    "maximum_knee_bend": 495,
+    "maximum_shoulder_external_rotation": 612,
+    "peak_velocity": 617,
+    "sustained_velocity_decrease": 622,
+    "stabilization": 627
+  },
+  "event_indices": {
+    "first_movement": 162,
+    "peak_hand_height": 444,
+    "maximum_knee_bend": 494,
+    "maximum_shoulder_external_rotation": 611,
+    "peak_velocity": 616,
+    "sustained_velocity_decrease": 621,
+    "stabilization": 626
+  },
+  "event_confidence": {
+    "first_movement": 0.12064784928737785,
+    "peak_hand_height": 1.0,
+    "maximum_knee_bend": 0.6581746853477186,
+    "maximum_shoulder_external_rotation": 0.5337770266640972,
+    "peak_velocity": 0.0589533972640941,
+    "sustained_velocity_decrease": 0.28840795538948816,
+    "stabilization": 0.8998027690792098
+  },
+  "warnings": []
+}

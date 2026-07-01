@@ -1,0 +1,19 @@
+{
+  "video_name": "IMG_3178.mp4",
+  "video_path": "2d_video/IMG_3178.mp4",
+  "frame_count": 360,
+  "expected_frame_count": 360,
+  "fps": 59.94005994005994,
+  "resolution": {
+    "width": 1080,
+    "height": 1920
+  },
+  "landmark_count": 33,
+  "confidence": {
+    "min": 0.029205268248915672,
+    "max": 0.9999982714653015,
+    "mean": 0.8916571469574552,
+    "median": 0.9918197095394135,
+    "missing_frames": 0
+  }
+}
