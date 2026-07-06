@@ -1,132 +1,121 @@
-import glob
-import sys
+"""
+Full-serve 3D skeleton animation (original ACE behavior).
+
+Usage:
+    python plotting/plot.py firstserve
+    python plotting/plot.py firstserve --speed 4
+
+Keys: + / = faster, - slower, R reset speed.
+
+For phase segmentation, timeline, and per-phase views use:
+    python plotting/view_serve_phases.py firstserve
+    python plotting/generate_segmentation_validation.py
+"""
+
+from __future__ import annotations
+
+import argparse
 import os
-import matplotlib.pyplot as plt
+
 import matplotlib.animation as animation
-import numpy as np
+import matplotlib.pyplot as plt
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "dtw"))
-from load_data import FILENAME_TO_MARKER
-from load_data import load_single_serve
-
-bones = [
-    ("head", "chest"),
-    ("chest", "left_shoulder"),
-    ("chest", "right_shoulder"),
-    ("left_shoulder", "left_elbow"),
-    ("left_shoulder", "right_shoulder"),
-    ("left_elbow", "left_hand"),
-    ("right_shoulder", "right_elbow"),
-    ("right_elbow", "right_hand"),
-    ("left_hip", "right_hip"),
-    ("chest", "left_hip"),
-    ("chest", "right_hip"),
-    ("left_hip", "left_knee"),
-    ("left_knee", "left_foot"),
-    ("right_hip", "right_knee"),
-    ("right_knee", "right_foot"),
-]
-
-# Accept a serve folder name as an optional command-line argument, e.g. "secondserve"
-serve_name = sys.argv[1] if len(sys.argv) > 1 else "firstserve"
-serve_dir = os.path.join(os.path.dirname(__file__), "markers", "individual", serve_name)
-if not os.path.isdir(serve_dir):
-    print(f"Serve folder not found: {serve_dir}")
-    sys.exit(1)
-
-marker_dict = {}
-for csv_path in glob.glob(os.path.join(serve_dir, "*.csv")):
-    stem = os.path.splitext(os.path.basename(csv_path))[0].lower()
-    marker_name = FILENAME_TO_MARKER.get(stem)
-    if marker_name:
-        marker_dict[marker_name] = csv_path
-
-markers = load_single_serve(marker_dict)
-frames = markers["frames"]
-n_frames = len(frames)
-marker_names = [k for k in markers if k != "frames"]
-
-
-def get_pos(joint, frame_idx):
-    m = markers[joint]
-    return (
-        float(m["TX"][frame_idx]),
-        float(m["TY"][frame_idx]),
-        float(m["TZ"][frame_idx]),
-    )
-
-
-# Fixed axis limits based on full data range
-all_x = np.concatenate([markers[m]["TX"] for m in marker_names])
-all_y = np.concatenate([markers[m]["TY"] for m in marker_names])
-all_z = np.concatenate([markers[m]["TZ"] for m in marker_names])
-
-all_x = all_x[~np.isnan(all_x)]
-all_y = all_y[~np.isnan(all_y)]
-all_z = all_z[~np.isnan(all_z)]
-
-
-def padded_limits(data, pad=0.08):
-    lo, hi = data.min(), data.max()
-    margin = (hi - lo) * pad
-    return lo - margin, hi + margin
-
-
-x_lim = padded_limits(all_x)
-y_lim = padded_limits(all_y)
-z_lim = padded_limits(all_z)
-
-x_range = x_lim[1] - x_lim[0]
-y_range = y_lim[1] - y_lim[0]
-z_range = z_lim[1] - z_lim[0]
-
-# Milliseconds between frames — lower = faster (16), higher = slower (33 ≈ 30 fps)
-INTERVAL_MS = 33
-
-cmap = plt.cm.get_cmap("tab20", len(marker_names))
-marker_colors = {name: cmap(i) for i, name in enumerate(sorted(marker_names))}
-
-fig = plt.figure(figsize=(10, 6))
-ax = fig.add_subplot(111, projection="3d")
-
-
-def apply_axes():
-    ax.set_xlim(*x_lim)
-    ax.set_ylim(*y_lim)
-    ax.set_zlim(*z_lim)
-    ax.set_box_aspect([x_range, y_range, z_range])
-    ax.set_xlabel("X")
-    ax.set_ylabel("Y")
-    ax.set_zlabel("Z")
-
-
-apply_axes()
-
-
-def update(frame_idx):
-    ax.cla()
-    apply_axes()
-    ax.set_title(f"{serve_name}  —  Frame {int(frames[frame_idx])}")
-
-    for joint in sorted(marker_names):
-        x, y, z = get_pos(joint, frame_idx)
-        if not (np.isnan(x) or np.isnan(y) or np.isnan(z)):
-            ax.scatter(x, y, z, s=20, color=marker_colors[joint], label=joint)
-
-    for start, end in bones:
-        if start not in markers or end not in markers:
-            continue
-        x0, y0, z0 = get_pos(start, frame_idx)
-        x1, y1, z1 = get_pos(end, frame_idx)
-        if any(np.isnan(v) for v in [x0, y0, z0, x1, y1, z1]):
-            continue
-        ax.plot([x0, x1], [y0, y1], [z0, z1], color="steelblue", linewidth=1.5)
-
-    ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1), fontsize=7, framealpha=0.7)
-
-
-ani = animation.FuncAnimation(
-    fig, update, frames=n_frames, interval=INTERVAL_MS, repeat=True
+from playback import (
+    ALLOWED_SPEEDS,
+    build_play_sequence,
+    format_playback_label,
+    playback_interval_ms,
+    snap_speed,
+    speed_down,
+    speed_up,
+)
+from skeleton_viz import (
+    compute_axis_limits,
+    draw_skeleton,
+    load_serve_from_dir,
+    marker_color_map,
+    marker_names,
 )
 
-plt.show()
+PLOT_DIR = os.path.dirname(os.path.abspath(__file__))
+INDIVIDUAL_DIR = os.path.join(PLOT_DIR, "markers", "individual")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Full-serve 3D skeleton animation")
+    parser.add_argument("serve", nargs="?", default="firstserve")
+    parser.add_argument("--speed", type=int, choices=ALLOWED_SPEEDS, default=1)
+    args = parser.parse_args()
+
+    serve_dir = os.path.join(INDIVIDUAL_DIR, args.serve)
+    if not os.path.isdir(serve_dir):
+        print(f"Serve folder not found: {serve_dir}")
+        raise SystemExit(1)
+
+    markers = load_serve_from_dir(serve_dir)
+    frames = markers["frames"]
+    n_frames = len(frames)
+    names = marker_names(markers)
+    x_lim, y_lim, z_lim = compute_axis_limits(markers)
+    colors = marker_color_map(names)
+    state = {"speed": snap_speed(args.speed), "ani": None}
+
+    fig = plt.figure(figsize=(10, 6))
+    ax = fig.add_subplot(111, projection="3d")
+
+    def draw_overlay(vicon_frame: int) -> None:
+        if hasattr(fig, "_speed_overlay") and fig._speed_overlay:
+            fig._speed_overlay.remove()
+        fig._speed_overlay = fig.text(
+            0.02,
+            0.02,
+            f"Serve: {args.serve}\nFrame: {vicon_frame}\nPlayback: {format_playback_label(state['speed'])}",
+            transform=fig.transFigure,
+            fontsize=10,
+            va="bottom",
+            family="monospace",
+            bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.85),
+        )
+
+    def start_animation() -> None:
+        if state["ani"] is not None:
+            state["ani"].event_source.stop()
+        spd = state["speed"]
+        play_sequence = build_play_sequence(n_frames, spd, "Full Serve")
+        interval = playback_interval_ms(spd)
+
+        def update(play_pos: int) -> None:
+            frame_idx = play_sequence[play_pos % len(play_sequence)]
+            ax.cla()
+            draw_skeleton(ax, markers, frame_idx, x_lim, y_lim, z_lim, colors)
+            vf = int(frames[frame_idx])
+            ax.set_title(f"{args.serve}  —  Frame {vf}")
+            draw_overlay(vf)
+
+        state["ani"] = animation.FuncAnimation(
+            fig,
+            update,
+            frames=max(len(play_sequence), 1),
+            interval=interval,
+            repeat=True,
+        )
+        fig.canvas.draw_idle()
+
+    def on_key(event) -> None:
+        if event.key in ("+", "="):
+            state["speed"] = speed_up(state["speed"])
+            start_animation()
+        elif event.key == "-":
+            state["speed"] = speed_down(state["speed"])
+            start_animation()
+        elif event.key in ("r", "R"):
+            state["speed"] = snap_speed(args.speed)
+            start_animation()
+
+    fig.canvas.mpl_connect("key_press_event", on_key)
+    start_animation()
+    plt.show()
+
+
+if __name__ == "__main__":
+    main()

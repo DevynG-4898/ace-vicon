@@ -52,7 +52,7 @@ def compute_barycenter(
     Returns:
         barycenter as np.ndarray of shape (n_frames, n_features)
     """
-    arrays = load_prepared_serves(dirpath, multi=False, skip_trim=True)
+    arrays = load_prepared_serves(dirpath, mode="individual", skip_trim=True)
     print(f"Loaded {len(arrays)} valid serves")
 
     # Initialise with the series closest to the median length to avoid

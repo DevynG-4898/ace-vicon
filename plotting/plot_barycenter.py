@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "dtw"))
-from constants import MARKER_ORDER
 
 bones = [
     ("head", "chest"),
@@ -28,13 +27,15 @@ bones = [
 # ---------------------------------------------------------------------------
 # Load barycenter and reconstruct marker dict
 # ---------------------------------------------------------------------------
-npy_path = os.path.join(os.path.dirname(__file__), "..", "dtw", "barycenter1.npy")
-barycenter = np.load(npy_path)  # shape (n_frames, n_markers * 3)
+npz_path = os.path.join(os.path.dirname(__file__), "..", "dtw", "barycenter1.npz")
+data = np.load(npz_path, allow_pickle=True)
+barycenter = data["barycenter"]   # shape (n_frames, n_markers * 3)
+marker_list = list(data["markers"])
 n_frames = barycenter.shape[0]
 
-# Slice columns back into per-marker TX/TY/TZ arrays
+# Slice columns back into per-marker TX/TY/TZ arrays using the stored marker list
 markers = {}
-for i, name in enumerate(MARKER_ORDER):
+for i, name in enumerate(marker_list):
     c = i * 3
     markers[name] = {
         "TX": barycenter[:, c],

@@ -1,6 +1,21 @@
+import importlib.util
+import os
+
 import pandas as pd
 
 from constants import MARKER_ORDER
+
+
+def _load_marker_order(csv_path):
+    """Return MARKER_ORDER from a <stem>_order.py sidecar next to the CSV, or None if absent."""
+    stem = os.path.splitext(os.path.basename(csv_path))[0]
+    order_path = os.path.join(os.path.dirname(csv_path), f"{stem}_order.py")
+    if not os.path.exists(order_path):
+        return None
+    spec = importlib.util.spec_from_file_location("_order", order_path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.MARKER_ORDER
 
 FILENAME_TO_MARKER = {
     "chest": "chest",
@@ -77,8 +92,12 @@ def load_multi_serve(filepath):
 
     # Row 0: track names  Row 1: TX/TY/TZ labels  Row 2: units  Row 3+: data
     n_markers = (raw.shape[1] - 2) // 3
+    order = _load_marker_order(filepath)
+    if order is None:
+        print(f"  WARNING: no sidecar _order.py for {os.path.basename(filepath)}, falling back to MARKER_ORDER")
+        order = MARKER_ORDER
     marker_names = [
-        MARKER_ORDER[i] if i < len(MARKER_ORDER) else f"Marker_{i + 1}"
+        order[i] if i < len(order) else f"unknown_{i + 1}"
         for i in range(n_markers)
     ]
 

@@ -1,16 +1,17 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
+from model import compute_similarity_from_csv, compute_similarity_from_video
+from racket_detector import detect_racket
 from supabase_helper import supabase
-from model import compute_similarity, load_csv, build_reference_model
 import matplotlib.pyplot as plt
 import os
 import json
 import hashlib
 import sqlite3
-import pandas as pd
 import numpy as np
 import matplotlib
-matplotlib.use('Agg')
 import datetime
+import re
+matplotlib.use('Agg')
 
 app = Flask(__name__)
 app.secret_key = "tennis_secret_key_change_in_production"
@@ -22,7 +23,6 @@ DB_FILE = "tennisiq.db"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# ✅ IMPORTANT: FIXED PATHS
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 REFERENCE_FILES = [
@@ -32,6 +32,9 @@ REFERENCE_FILES = [
     os.path.join(BASE_DIR, "data/max_serves/max4.csv"),
     os.path.join(BASE_DIR, "data/max_serves/max5.csv"),
 ]
+
+CSV_EXTENSIONS = {".csv"}
+VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
 
 # ── DATABASE ─────────────────────────────────────────────
 
@@ -104,6 +107,19 @@ def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 
+def validate_password(password):
+    errors = []
+    if len(password) < 8:
+        errors.append("at least 8 characters")
+    if not re.search(r"[A-Z]", password):
+        errors.append("at least one uppercase letter")
+    if not re.search(r"[a-z]", password):
+        errors.append("at least one lowercase letter")
+    if not re.search(r"\d", password):
+        errors.append("at least one number")
+    return errors
+
+
 # ── FEEDBACK ─────────────────────────────────────────────
 
 PLAYER_FEEDBACK = {
@@ -122,14 +138,15 @@ PLAYER_FEEDBACK = {
 # ── GRAPH FUNCTION ─────────────────────────────────────────
 
 
-def create_plot(file_path):
-    df = pd.read_csv(file_path, skiprows=3, header=None)
-    numeric = df.select_dtypes(include=[np.number])
-    
+def create_plot(user_traj, reference_traj):
     plt.figure()
-    plt.plot(numeric.values)
+    plt.plot(user_traj, label="Your serve")
+    plt.plot(reference_traj, label="Reference (Max)")
+    plt.legend()
     plot_filename = "plot.png"
-    plot_path = os.path.join("static", plot_filename)
+    static_dir = os.path.join(BASE_DIR, "static")
+    os.makedirs(static_dir, exist_ok=True)
+    plot_path = os.path.join(static_dir, plot_filename)
     plt.savefig(plot_path)
     plt.close()
     return plot_filename
@@ -265,18 +282,40 @@ def upload():
         flash("No file uploaded.")
         return redirect(url_for("analyse"))
 
-    if not file.filename.lower().endswith(".csv"):
-        flash("Please upload a CSV file.")
+    filename = file.filename
+    ext = os.path.splitext(filename)[1].lower()
+
+    if ext not in CSV_EXTENSIONS and ext not in VIDEO_EXTENSIONS:
+        flash("Please upload a CSV or video file (.csv, .mp4, .mov, .avi, .mkv, .webm).")
         return redirect(url_for("analyse"))
 
-    save_path = os.path.join(app.config["UPLOAD_FOLDER"], file.filename)
+    save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
     file.save(save_path)
 
-    try:
-        score = compute_similarity(save_path, REFERENCE_FILES)
-        score = round(score, 1)
+    # ── RACKET RELEVANCE CHECK (video uploads only) ─────────
+    # CSV files have no visual content, so this only applies to videos.
+    # Rejects the upload before it ever reaches the expensive
+    # MediaPipe pose-extraction step.
+    if ext in VIDEO_EXTENSIONS:
+        passed, details = detect_racket(save_path)
+        if not passed:
+            os.remove(save_path)
+            print(f"RACKET CHECK FAILED for {filename}: {details}")
+            flash("We couldn't detect a tennis racket in your video. Please upload a video of your serve.")
+            return redirect(url_for("analyse"))
 
-        plot_path = create_plot(save_path)
+    try:
+        if ext in CSV_EXTENSIONS:
+            score, avg_z, ref_mean, user_traj = compute_similarity_from_csv(
+                save_path, REFERENCE_FILES
+            )
+        else:
+            score, avg_z, ref_mean, user_traj = compute_similarity_from_video(
+                save_path, REFERENCE_FILES
+            )
+
+        score = round(score, 1)
+        plot_path = create_plot(user_traj, ref_mean)
 
     except Exception as e:
         print(f"UPLOAD ERROR: {e}")
@@ -299,7 +338,7 @@ def upload():
     return render_template(
         "result.html",
         user=session["user"],
-        filename=file.filename,
+        filename=filename,
         player=feedback,
         score=score,
         plot_path=plot_path,

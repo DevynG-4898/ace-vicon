@@ -1,0 +1,9 @@
+TENNIS SERVE ANGLE ANALYSIS
+==================================================
+
+shoulder_angle: 175.11°
+elbow_angle: 179.32°
+wrist_angle: 123.10°
+hip_rotation: 26.04°
+knee_angle: 135.06°
+trunk_lean: 10.69°

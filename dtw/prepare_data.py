@@ -181,47 +181,45 @@ def normalize_serve(serve_data, anchor="right_hip"):
     return result
 
 
-def convert(serve_data):
-    """Convert a serve dict to a numpy array ordered by MARKER_ORDER.
+def convert(serve_data, markers=None):
+    """Convert a serve dict to a numpy array ordered by MARKER_ORDER (or a subset).
 
     Args:
         serve_data: dict from load_data (after filtering and interpolation)
+        markers: list of marker names to include; defaults to MARKER_ORDER
 
     Returns:
         np.ndarray of shape (n_frames, n_markers * 3)
         Columns ordered as [head_TX, head_TY, head_TZ, left_shoulder_TX, ...]
     """
+    if markers is None:
+        markers = MARKER_ORDER
     columns = []
-    for marker in MARKER_ORDER:
+    for marker in markers:
         m = serve_data[marker]
         columns.extend([m["TX"], m["TY"], m["TZ"]])
     return np.column_stack(columns)
 
 
-def load_prepared_serves(dirpath, multi=True, serve_threshold=0.2, frame_threshold=0.5, skip_trim=False):
-    """Load all serves from dirpath, run the full preparation pipeline, and return
-    the resulting list of numpy arrays.
-
-    When multi=True, expects dirpath to contain one multi-marker CSV per serve.
-    When multi=False, expects dirpath to contain one subdirectory per serve, each
-    subdirectory holding one CSV file per marker (e.g. righthand.csv, leftelbow.csv).
+def load_raw_serves(dirpath, mode="multi", skip_trim=False):
+    """Load raw serve dicts from dirpath, tagging each with _filename and _skip_trim.
 
     Args:
         dirpath: path to the serve data folder
-        multi: True for flat multi-marker CSVs, False for per-serve subdirectories
-        serve_threshold: passed through to prepare_all_serves
-        frame_threshold: passed through to prepare_all_serves
+        mode: "multi" for flat multi-marker CSVs, "individual" for per-serve subdirectories
+        skip_trim: value to store in each serve's _skip_trim field
 
     Returns:
-        list of np.ndarray, one per valid serve
+        list of raw serve dicts (not yet prepared)
     """
     serves = []
-    if multi:
+    if mode == "multi":
         for p in sorted(glob.glob(os.path.join(dirpath, "*.csv"))):
             serve = load_multi_serve(p)
             serve["_filename"] = os.path.basename(p)
+            serve["_skip_trim"] = skip_trim
             serves.append(serve)
-    else:
+    else:  # mode == "individual"
         serve_dirs = sorted([
             d for d in glob.glob(os.path.join(dirpath, "*"))
             if os.path.isdir(d)
@@ -236,8 +234,31 @@ def load_prepared_serves(dirpath, multi=True, serve_threshold=0.2, frame_thresho
             if marker_dict:
                 serve = load_single_serve(marker_dict)
                 serve["_filename"] = os.path.basename(serve_dir)
+                serve["_skip_trim"] = skip_trim
                 serves.append(serve)
-    return prepare_all_serves(serves, serve_threshold, frame_threshold, skip_trim=skip_trim)
+    return serves
+
+
+def load_prepared_serves(dirpath, mode="multi", frame_threshold=0.5, skip_trim=False):
+    """Load all serves from dirpath, run the full preparation pipeline, and return
+    the resulting list of numpy arrays.
+
+    When mode="multi", expects dirpath to contain one multi-marker CSV per serve.
+    When mode="individual", expects dirpath to contain one subdirectory per serve,
+    each subdirectory holding one CSV file per marker (e.g. righthand.csv, leftelbow.csv).
+
+    Args:
+        dirpath: path to the serve data folder
+        mode: "multi" for flat multi-marker CSVs, "individual" for per-serve subdirectories
+        frame_threshold: passed through to prepare_all_serves
+        skip_trim: passed through to load_raw_serves and prepare_all_serves
+
+    Returns:
+        list of np.ndarray, one per serve
+    """
+    serves = load_raw_serves(dirpath, mode, skip_trim=skip_trim)
+    arrays, _ = prepare_all_serves(serves, frame_threshold=frame_threshold)
+    return arrays
 
 
 def filter_length_outliers(named_serves, min_frames=300, max_frames=480):
@@ -265,43 +286,32 @@ def filter_length_outliers(named_serves, min_frames=300, max_frames=480):
 
 def prepare_all_serves(
     serves,
-    serve_threshold=0.2,
     frame_threshold=0.5,
-    min_frames=300,
-    max_frames=480,
     skip_trim=False,
 ):
-    """Filter, clean, and convert a list of serve dicts to numpy arrays.
+    """Clean and convert all serves to numpy arrays — nothing is dropped.
 
     Pipeline per serve:
-      1. Drop entire serve if overall NaN fraction exceeds serve_threshold
-      2. Trim to active motion window (skipped when skip_trim=True)
-      3. Drop if NaN fraction after trim exceeds serve_threshold
-      4. Drop serves whose trimmed length is outside [min_frames, max_frames]
-         (skipped when skip_trim=True)
-      5. Drop individual frames exceeding frame_threshold
-      6. Interpolate remaining NaNs
-      7. Normalize and convert to numpy array
+      1. Trim to active motion window (skipped when skip_trim=True)
+      2. Drop individual frames where NaN fraction across all markers exceeds frame_threshold
+      3. Interpolate remaining NaNs (fully-missing markers stay NaN, filled with 0 at end)
+      4. Normalize relative to right_hip
+      5. Convert to numpy array using the common marker set
 
     Args:
         serves: list of dicts from load_data
-        serve_threshold: max allowed overall NaN fraction to keep a serve (default 0.2)
-        frame_threshold: max allowed per-frame NaN fraction to keep a frame (default 0.5)
-        min_frames: minimum trimmed frame count (default 300, ignored when skip_trim=True)
-        max_frames: maximum trimmed frame count (default 480, ignored when skip_trim=True)
-        skip_trim: if True, skip trimming and length filtering entirely (default False)
+        frame_threshold: max allowed per-frame NaN fraction to drop a frame (default 0.5)
+        skip_trim: if True, skip trimming for all serves (default False)
 
     Returns:
-        list of np.ndarray, one per valid serve
+        (arrays, common_markers) where arrays is a list of np.ndarray, one per serve
     """
-    # Pass 1: NaN checks and optional trimming
+    # Pass 1: optional trimming — no serves dropped
     trimmed = []
     for serve in serves:
         filename = serve.pop("_filename", "unknown")
-        if not is_valid_serve(serve, serve_threshold):
-            print(f"  {filename}: DROPPED (failed NaN check before trim)")
-            continue
-        if skip_trim:
+        serve_skip_trim = serve.pop("_skip_trim", skip_trim)
+        if serve_skip_trim:
             print(f"  {filename}: {len(serve['frames'])} frames (trim skipped)")
             trimmed.append((filename, serve))
         else:
@@ -309,30 +319,39 @@ def prepare_all_serves(
             serve = trim_serve(serve)
             after = len(serve["frames"])
             print(f"  {filename}: {before} frames -> {after} after trim")
-            if not is_valid_serve(serve, serve_threshold):
-                print(f"  {filename}: DROPPED (failed NaN check after trim)")
-                continue
             trimmed.append((filename, serve))
 
-    # Pass 2: drop length outliers (only when trimming is active)
-    if not skip_trim and len(trimmed) > 1:
-        trimmed = filter_length_outliers(trimmed, min_frames, max_frames)
-
-    # Pass 3: frame-level cleaning and conversion
-    results = []
+    # Pass 2: frame-level cleaning (defer conversion until common markers are known)
+    cleaned = []
     for filename, serve in trimmed:
         missing = [m for m in MARKER_ORDER if m not in serve]
         if missing:
-            print(f"  {filename}: DROPPED (missing markers: {missing})")
-            continue
+            print(f"  {filename}: missing markers {missing} (will use common set)")
         serve = filter_nan_frames(serve, frame_threshold)
         serve = interpolate_nans(serve)
         serve = normalize_serve(serve)
-        arr = convert(serve)
+        cleaned.append((filename, serve))
+
+    # Find the intersection of markers present in every serve
+    if not cleaned:
+        return [], []
+    available_per_serve = [
+        {m for m in MARKER_ORDER if m in serve} for _, serve in cleaned
+    ]
+    common_markers = sorted(
+        set.intersection(*available_per_serve), key=MARKER_ORDER.index
+    )
+    dropped_markers = [m for m in MARKER_ORDER if m not in common_markers]
+    if dropped_markers:
+        print(f"  Excluding markers absent from some serves: {dropped_markers}")
+
+    # Convert using only common markers; fill any residual NaNs with 0
+    results = []
+    for filename, serve in cleaned:
+        arr = convert(serve, markers=common_markers)
         if np.isnan(arr).any():
-            print(
-                f"  {filename}: DROPPED (NaN remains after interpolation — marker fully missing)"
-            )
-            continue
+            n_nan = np.isnan(arr).sum()
+            print(f"  {filename}: filling {n_nan} residual NaN(s) with 0")
+            arr = np.nan_to_num(arr, nan=0.0)
         results.append(arr)
-    return results
+    return results, common_markers

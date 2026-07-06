@@ -1,0 +1,19 @@
+{
+  "video_name": "andy.mp4",
+  "video_path": "2d_video/andy.mp4",
+  "frame_count": 104,
+  "expected_frame_count": 104,
+  "fps": 25.0,
+  "resolution": {
+    "width": 1920,
+    "height": 1080
+  },
+  "landmark_count": 33,
+  "confidence": {
+    "min": 0.041330885142087936,
+    "max": 0.9999976754188538,
+    "mean": 0.8901252156896364,
+    "median": 0.9936744272708893,
+    "missing_frames": 0
+  }
+}
