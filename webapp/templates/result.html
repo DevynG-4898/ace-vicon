@@ -63,13 +63,19 @@
       </div>
 
       <!-- GRAPH -->
-      <div class="card">
-        <h3>Serve Comparison</h3>
-        <img src="{{ plot_path }}" />
-        <p style="color: #5a6470; font-size: 0.85rem">
-          Your serve (blue) vs reference model (Max)
-        </p>
-      </div>
+     <div class="card">
+      <h3>Serve Comparison</h3>
+      {% if plot_path %}
+      <img src="{{ url_for('static', filename=plot_path) }}" />
+      <p style="color: #5a6470; font-size: 0.85rem">
+        Your serve (blue) vs reference model (Max)
+      </p>
+      {% else %}
+      <p style="color: #5a6470; font-size: 0.85rem">
+        Plot visualization coming soon.
+      </p>
+      {% endif %}
+    </div>
 
       <!-- TIPS -->
       <div class="card">

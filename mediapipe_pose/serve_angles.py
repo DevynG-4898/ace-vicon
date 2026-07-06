@@ -3,10 +3,23 @@ serve_angles.py
 Pure angle-calculation logic for tennis serve biomechanics.
 No drawing, no video I/O — just math.
 
-Updated to use 3D (x, y, z) coordinates for more accurate angle calculations,
-especially when the serving arm goes behind the body (occlusion in 2D).
-Note: MediaPipe z is relative depth — less accurate than x/y but still
-improves results significantly over pure 2D for occluded joints.
+Uses 3D (x, y, z) coordinates for angle calculations. Callers should pass
+in MediaPipe *world* landmarks (pose_world_landmarks), which are metric-scale
+and hip-centered, rather than the normalized pose_landmarks — normalized
+x/y are image-relative and z is only a rough depth proxy, which distorts
+angle math as camera distance/zoom changes across frames.
+
+UPDATED: Occlusion handling via landmark.visibility.
+- Each landmark used in an angle calculation is checked against
+  `visibility_threshold` before being trusted.
+- If any landmark feeding an angle is below threshold, that angle is
+  returned as float('nan') rather than a silently-wrong value computed
+  from a guessed coordinate.
+- `get_all_angles()` also exposes the minimum visibility among the
+  landmarks used for each angle, so downstream code (CSV export,
+  interpolation, accuracy comparison) can distinguish confident angles
+  from occlusion-derived ones and report interpolated-vs-not accuracy
+  separately.
 """
 
 import math
@@ -18,7 +31,9 @@ class TennisServeAnalyzer:
     Calculates 6 key joint angles from a MediaPipe pose for tennis serve analysis.
 
     Supports right-handed (default) and left-handed serves via the `hand` parameter.
-    Uses 3D (x, y, z) coordinates to handle occlusion from camera angle.
+    Uses 3D (x, y, z) coordinates to handle occlusion from camera angle, and
+    gates each angle on landmark visibility to avoid silently trusting
+    guessed/occluded coordinates.
     """
 
     # MediaPipe landmark indices
@@ -45,44 +60,58 @@ class TennisServeAnalyzer:
         },
     }
 
-    def __init__(self, pose_landmarks, hand: str = 'right'):
+    NAN = float('nan')
+
+    def __init__(self, pose_landmarks, hand: str = 'right',
+                 visibility_threshold: float = 0.5):
         """
         Args:
-            pose_landmarks: MediaPipe pose landmark list for one person.
-            hand:           'right' or 'left' — which arm is serving.
+            pose_landmarks:        MediaPipe pose landmark list for one person.
+                                    Expected to be *world* landmarks (metric-scale)
+                                    for accurate angle math, not normalized
+                                    image-space landmarks.
+            hand:                  'right' or 'left' — which arm is serving.
+            visibility_threshold:  Minimum landmark.visibility required to
+                                    trust a landmark in angle computation.
+                                    Landmarks below this are treated as
+                                    missing (occluded).
         """
         if hand not in ('right', 'left'):
             raise ValueError(f"hand must be 'right' or 'left', got '{hand}'")
 
-        self.lm   = pose_landmarks
-        self._idx = self._LANDMARKS[hand]
-
-        self.prev_elbow_angle    = None
-        self.prev_shoulder_angle = None
-        self.prev_wrist_angle    = None
-        self.prev_time           = None
-
-        self.prev_elbow_vel      = None
-        self.prev_shoulder_vel   = None
-        self.prev_wrist_vel      = None
+        self.lm                    = pose_landmarks
+        self._idx                  = self._LANDMARKS[hand]
+        self.visibility_threshold  = visibility_threshold
 
     # ------------------------------------------------------------------
     # Internal math helpers
     # ------------------------------------------------------------------
 
-    def _pt3d(self, landmark) -> np.ndarray:
-        """Extract (x, y, z) from a MediaPipe landmark as a numpy array."""
+    def _pt3d(self, landmark):
+        """
+        Extract (x, y, z) from a MediaPipe landmark as a numpy array,
+        or None if the landmark's visibility is below threshold.
+        """
+        if landmark.visibility < self.visibility_threshold:
+            return None
         return np.array([landmark.x, landmark.y, landmark.z])
 
-    def _angle(self, p1, p2, p3) -> float:
+    def _min_visibility(self, *landmarks) -> float:
+        """Minimum visibility across a set of landmarks."""
+        return min(l.visibility for l in landmarks)
+
+    def _angle(self, p1, p2, p3):
         """
         Angle at p2 formed by p1-p2-p3 in 3D space (degrees).
-        Uses x, y, z coordinates — improves accuracy when joints are
-        occluded or behind the body relative to the camera.
+        Returns float('nan') if any of the three points is below the
+        visibility threshold, rather than computing from a guessed value.
         """
         a = self._pt3d(p1)
         b = self._pt3d(p2)
         c = self._pt3d(p3)
+
+        if a is None or b is None or c is None:
+            return self.NAN
 
         v1, v2 = a - b, c - b
 
@@ -90,16 +119,21 @@ class TennisServeAnalyzer:
         norm2 = np.linalg.norm(v2)
 
         if norm1 < 1e-6 or norm2 < 1e-6:
-            return 0.0
+            return self.NAN
 
         cos = np.clip(np.dot(v1, v2) / (norm1 * norm2), -1.0, 1.0)
         return math.degrees(math.acos(cos))
 
-    def _vertical_angle(self, p1, p2) -> float:
+    def _vertical_angle(self, p1, p2):
         """
         Deviation of the p1→p2 line from vertical in 3D (degrees).
-        Uses x, y, z — accounts for forward/backward lean in depth.
+        Returns float('nan') if either landmark is below the visibility
+        threshold.
         """
+        if p1.visibility < self.visibility_threshold or \
+           p2.visibility < self.visibility_threshold:
+            return self.NAN
+
         dx = p2.x - p1.x
         dy = p2.y - p1.y
         dz = p2.z - p1.z
@@ -141,6 +175,10 @@ class TennisServeAnalyzer:
         l11, l12 = self.lm[11], self.lm[12]
         l23, l24 = self.lm[23], self.lm[24]
 
+        if min(l11.visibility, l12.visibility, l23.visibility, l24.visibility) \
+                < self.visibility_threshold:
+            return self.NAN
+
         sv = np.array([l12.x - l11.x, l12.y - l11.y, l12.z - l11.z])
         hv = np.array([l24.x - l23.x, l24.y - l23.y, l24.z - l23.z])
 
@@ -148,7 +186,7 @@ class TennisServeAnalyzer:
         norm_hv = np.linalg.norm(hv)
 
         if norm_sv < 1e-6 or norm_hv < 1e-6:
-            return 0.0
+            return self.NAN
 
         cos = np.clip(np.dot(sv, hv) / (norm_sv * norm_hv), -1.0, 1.0)
         return math.degrees(math.acos(cos))
@@ -163,16 +201,23 @@ class TennisServeAnalyzer:
     def get_trunk_lean_angle(self) -> float:
         """
         Forward lean of the torso from vertical in 3D.
-        Now accounts for depth (z) so forward lean into the serve
-        is captured, not just side-to-side lean.
+        Accounts for depth (z) so forward lean into the serve is
+        captured, not just side-to-side lean.
         """
-        mid_sh_x = (self.lm[11].x + self.lm[12].x) / 2
-        mid_sh_y = (self.lm[11].y + self.lm[12].y) / 2
-        mid_sh_z = (self.lm[11].z + self.lm[12].z) / 2
+        l11, l12 = self.lm[11], self.lm[12]
+        l23, l24 = self.lm[23], self.lm[24]
 
-        mid_hp_x = (self.lm[23].x + self.lm[24].x) / 2
-        mid_hp_y = (self.lm[23].y + self.lm[24].y) / 2
-        mid_hp_z = (self.lm[23].z + self.lm[24].z) / 2
+        if min(l11.visibility, l12.visibility, l23.visibility, l24.visibility) \
+                < self.visibility_threshold:
+            return self.NAN
+
+        mid_sh_x = (l11.x + l12.x) / 2
+        mid_sh_y = (l11.y + l12.y) / 2
+        mid_sh_z = (l11.z + l12.z) / 2
+
+        mid_hp_x = (l23.x + l24.x) / 2
+        mid_hp_y = (l23.y + l24.y) / 2
+        mid_hp_z = (l23.z + l24.z) / 2
 
         dx = mid_sh_x - mid_hp_x
         dy = mid_sh_y - mid_hp_y
@@ -182,11 +227,42 @@ class TennisServeAnalyzer:
         return math.degrees(math.atan2(horizontal, abs(dy)))
 
     # ------------------------------------------------------------------
+    # Confidence (min visibility used per angle)
+    # ------------------------------------------------------------------
+
+    def get_angle_confidences(self) -> dict:
+        """
+        Return the minimum landmark visibility used to compute each angle.
+        Useful downstream to flag which angles were interpolated / how
+        trustworthy a given (possibly non-NaN) angle actually is.
+        """
+        i = self._idx
+        l11, l12, l23, l24 = self.lm[11], self.lm[12], self.lm[23], self.lm[24]
+        return {
+            'shoulder_angle': self._min_visibility(self.lm[i['opp_shoulder']],
+                                                     self.lm[i['shoulder']],
+                                                     self.lm[i['elbow']]),
+            'elbow_angle':    self._min_visibility(self.lm[i['shoulder']],
+                                                     self.lm[i['elbow']],
+                                                     self.lm[i['wrist']]),
+            'wrist_angle':    self._min_visibility(self.lm[i['elbow']],
+                                                     self.lm[i['wrist']],
+                                                     self.lm[i['index']]),
+            'hip_rotation':   self._min_visibility(l11, l12, l23, l24),
+            'knee_angle':     self._min_visibility(self.lm[i['hip']],
+                                                     self.lm[i['knee']],
+                                                     self.lm[i['ankle']]),
+            'trunk_lean':     self._min_visibility(l11, l12, l23, l24),
+        }
+
+    # ------------------------------------------------------------------
     # Aggregate — angles
     # ------------------------------------------------------------------
 
     def get_all_angles(self) -> dict:
-        """Return all 6 angles as a dictionary."""
+        """Return all 6 angles as a dictionary. Values are float('nan')
+        wherever the required landmarks were below the visibility
+        threshold (occluded)."""
         return {
             'shoulder_angle': self.get_shoulder_angle(),
             'elbow_angle':    self.get_elbow_angle(),
@@ -197,58 +273,33 @@ class TennisServeAnalyzer:
         }
 
     # ------------------------------------------------------------------
-    # Aggregate — raw coordinates
+    # Reporting
     # ------------------------------------------------------------------
 
-    def get_all_coordinates(self) -> dict:
+    def print_analysis(self, angles: dict = None) -> dict:
         """
-        Return raw (x, y, z) coordinates for all key landmarks
-        plus visibility scores.
-        Coordinates are normalized (0-1) as provided by MediaPipe.
+        Print a human-readable summary of the computed angles.
+
+        Args:
+            angles: Pre-computed angle dict (from get_all_angles()). If not
+                    provided, computed on the fly.
+
+        Returns:
+            The angle dict that was printed.
         """
-        lm = self.lm
-        return {
-            # ── Right side (serving arm) ──────────────────────────────
-            'r_shoulder_x': lm[12].x, 'r_shoulder_y': lm[12].y, 'r_shoulder_z': lm[12].z,
-            'r_elbow_x':    lm[14].x, 'r_elbow_y':    lm[14].y, 'r_elbow_z':    lm[14].z,
-            'r_wrist_x':    lm[16].x, 'r_wrist_y':    lm[16].y, 'r_wrist_z':    lm[16].z,
-            'r_hip_x':      lm[24].x, 'r_hip_y':      lm[24].y, 'r_hip_z':      lm[24].z,
-            'r_knee_x':     lm[26].x, 'r_knee_y':     lm[26].y, 'r_knee_z':     lm[26].z,
-            'r_ankle_x':    lm[28].x, 'r_ankle_y':    lm[28].y, 'r_ankle_z':    lm[28].z,
+        if angles is None:
+            angles = self.get_all_angles()
 
-            # ── Left side (toss arm) ──────────────────────────────────
-            'l_shoulder_x': lm[11].x, 'l_shoulder_y': lm[11].y, 'l_shoulder_z': lm[11].z,
-            'l_elbow_x':    lm[13].x, 'l_elbow_y':    lm[13].y, 'l_elbow_z':    lm[13].z,
-            'l_wrist_x':    lm[15].x, 'l_wrist_y':    lm[15].y, 'l_wrist_z':    lm[15].z,
-            'l_hip_x':      lm[23].x, 'l_hip_y':      lm[23].y, 'l_hip_z':      lm[23].z,
-            'l_knee_x':     lm[25].x, 'l_knee_y':     lm[25].y, 'l_knee_z':     lm[25].z,
-            'l_ankle_x':    lm[27].x, 'l_ankle_y':    lm[27].y, 'l_ankle_z':    lm[27].z,
+        confidences = self.get_angle_confidences()
 
-            # ── Visibility scores ─────────────────────────────────────
-            'r_shoulder_vis': lm[12].visibility,
-            'r_elbow_vis':    lm[14].visibility,
-            'r_wrist_vis':    lm[16].visibility,
-            'l_shoulder_vis': lm[11].visibility,
-            'l_elbow_vis':    lm[13].visibility,
-            'l_wrist_vis':    lm[15].visibility,
-        }
-
-    def print_analysis(self) -> dict:
-        """Print a formatted coaching report and return the angle dict."""
-        angles = self.get_all_angles()
-        print("\n" + "=" * 50)
-        print("TENNIS SERVE ANALYSIS (3D)")
+        print("\nTENNIS SERVE ANGLE ANALYSIS")
         print("=" * 50)
-        rows = [
-            ("Shoulder (serving arm)", angles['shoulder_angle'], "80–120°  arm extension"),
-            ("Elbow (serving arm)",    angles['elbow_angle'],    "90–120°  trophy position"),
-            ("Wrist",                  angles['wrist_angle'],    "150–180° slight extension"),
-            ("Hip Rotation",           angles['hip_rotation'],   "20–45°   good rotation"),
-            ("Knee (back leg)",        angles['knee_angle'],     "140–170° slight bend"),
-            ("Trunk Lean",             angles['trunk_lean'],     "5–20°    forward lean"),
-        ]
-        for i, (label, value, ideal) in enumerate(rows, 1):
-            print(f"\n{i}. {label}: {value:.1f}°")
-            print(f"   └─ Ideal: {ideal}")
-        print("\n" + "=" * 50)
+        for name, value in angles.items():
+            if value != value:  # NaN check
+                print(f"  {name:16s}: N/A (occluded, min visibility "
+                      f"{confidences[name]:.2f})")
+            else:
+                print(f"  {name:16s}: {value:6.2f}°  "
+                      f"(min visibility {confidences[name]:.2f})")
+
         return angles

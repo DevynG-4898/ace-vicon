@@ -60,12 +60,12 @@ POSE_CONNECTIONS = [
 # Detector factory
 # ---------------------------------------------------------------------------
 
-def create_detector(mode: str = 'image'):
+def create_detector(mode='video'):
     """
     Create and return a MediaPipe PoseLandmarker.
 
     Args:
-        mode: 'image' for single images, 'video' for frame-by-frame video.
+        'video' for frame-by-frame video.
     """
     _DIR = os.path.dirname(os.path.abspath(__file__))
     base_options = python.BaseOptions(model_asset_path=os.path.join(_DIR, 'pose_landmarker_heavy.task'))
@@ -76,83 +76,8 @@ def create_detector(mode: str = 'image'):
             output_segmentation_masks=False,
             running_mode=vision.RunningMode.VIDEO
         )
-    else:
-        options = vision.PoseLandmarkerOptions(
-            base_options=base_options,
-            output_segmentation_masks=False,
-            running_mode=vision.RunningMode.IMAGE
-        )
-
     return vision.PoseLandmarker.create_from_options(options)
 
-# ---------------------------------------------------------------------------
-# Orientation correction (images only)
-# ---------------------------------------------------------------------------
-
-def _upright_score(pose_landmarks) -> float:
-    """Score how upright a detected pose is (head above feet = high score)."""
-    nose_y     = pose_landmarks[0].y
-    shoulder_y = (pose_landmarks[11].y + pose_landmarks[12].y) / 2
-    hip_y      = (pose_landmarks[23].y + pose_landmarks[24].y) / 2
-    ankle_y    = (pose_landmarks[27].y + pose_landmarks[28].y) / 2
-
-    score = 0.0
-    score += 1.0 if nose_y     < shoulder_y else -1.0
-    score += 1.0 if shoulder_y < hip_y      else -1.0
-    score += 1.0 if hip_y      < ankle_y    else -1.0
-
-    height = abs(ankle_y - nose_y)
-    width  = abs(pose_landmarks[11].x - pose_landmarks[12].x)
-    if height > width:
-        score += 0.5
-
-    return score
-
-
-def _brute_force_rotation(image_path: str, detector):
-    """Try all 4 rotations and pick the one that gives the most upright pose."""
-    import os
-
-    rotations = [
-        (0,   None),
-        (90,  cv2.ROTATE_90_CLOCKWISE),
-        (180, cv2.ROTATE_180),
-        (270, cv2.ROTATE_90_COUNTERCLOCKWISE),
-    ]
-
-    best_score    = -1
-    best_rotation = None
-    original      = cv2.imread(image_path)
-    tmp_path      = "temp_orientation_test.jpg"
-
-    for angle, rot_code in rotations:
-        test_img = cv2.rotate(original, rot_code) if rot_code else original.copy()
-        cv2.imwrite(tmp_path, test_img)
-        try:
-            mp_img = mp.Image.create_from_file(tmp_path)
-            result = detector.detect(mp_img)
-            if result.pose_landmarks:
-                score = _upright_score(result.pose_landmarks[0])
-                print(f"Rotation {angle}°: score = {score:.3f}")
-                if score > best_score:
-                    best_score    = score
-                    best_rotation = rot_code
-        except Exception:
-            continue
-
-    if os.path.exists(tmp_path):
-        os.remove(tmp_path)
-
-    return best_rotation
-
-
-def get_image_rotation(image_path: str, detector):
-    """
-    Determine the correct rotation for an image using brute-force pose scoring.
-    Skips EXIF as phone EXIF tags are often unreliable.
-    """
-    print("Trying all rotations to find best orientation...")
-    return _brute_force_rotation(image_path, detector)
 
 # ---------------------------------------------------------------------------
 # Drawing

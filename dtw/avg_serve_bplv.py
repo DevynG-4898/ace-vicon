@@ -7,10 +7,10 @@ from dtaidistance import dtw
 # ---------------------------------------------------------------------------
 
 SERVE_PATHS = [
-    "../mediapipe_pose/serve_recs/serve_3_bplv/outputs/s1_20260622_210848/s1_coords_angles.csv",
-    "../mediapipe_pose/serve_recs/serve_3_bplv/outputs/s2_20260622_210926/s2_coords_angles.csv",
-    "../mediapipe_pose/serve_recs/serve_3_bplv/outputs/s3_20260622_211039/s3_coords_angles.csv",
-    "../mediapipe_pose/serve_recs/serve_3_bplv/outputs/s4_20260622_211317/s4_coords_angles.csv",
+    "../mediapipe_pose/serve_recs/serve_3_bplv/outputs/s1/s1_angles.csv",
+    "../mediapipe_pose/serve_recs/serve_3_bplv/outputs/s2/s2_angles.csv",
+    "../mediapipe_pose/serve_recs/serve_3_bplv/outputs/s3/s3_angles.csv",
+    "../mediapipe_pose/serve_recs/serve_3_bplv/outputs/s4/s4_angles.csv",
 ]
 
 # Index into SERVE_PATHS for the serve to use as the initial reference.
