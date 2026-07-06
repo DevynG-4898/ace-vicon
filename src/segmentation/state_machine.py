@@ -313,32 +313,6 @@ def assign_coaching_phases(
     return {name: (f(phases_idx[name][0]), f(phases_idx[name][1])) for name in V2_PHASE_NAMES}
 
 
-def assign_phases_v2(
-    events: dict[str, int], n: int, frame_ids: np.ndarray
-) -> dict[str, tuple[int, int]]:
-    """Deprecated extrema-based mapping; retained for backward compatibility in tests."""
-    e1 = events["first_movement"]
-    e2 = events["toss_apex"]
-    e3 = events["maximum_knee_bend"]
-    e4 = events["maximum_shoulder_external_rotation"]
-    e5 = events["contact"]
-    e6 = events["finish"]
-
-    def f(i: int) -> int:
-        return int(frame_ids[min(max(i, 0), n - 1)])
-
-    phases_idx = {
-        "Start_Stance": (0, max(0, e1 - 1)),
-        "Release": (e1, max(e1, e2 - 1)),
-        "Loading": (e2, max(e2, e3 - 1)),
-        "Cocking": (e3, max(e3, e4 - 1)),
-        "Acceleration": (e4, max(e4, e5 - 2)),
-        "Contact": (max(0, e5 - 1), min(n - 1, e5 + 1)),
-        "Deceleration_Finish": (min(e5 + 2, n - 1), max(e6, e5 + 2)),
-    }
-    return {name: (f(phases_idx[name][0]), f(phases_idx[name][1])) for name in V2_PHASE_NAMES}
-
-
 def validate_phases(
     phases: dict[str, tuple[int, int]], warnings: list[str], contact_single_frame_ok: bool = False
 ) -> None:

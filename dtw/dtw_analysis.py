@@ -4,12 +4,15 @@ import numpy as np
 from dtw import dtw
 from scipy.spatial.distance import cdist
 
-from prepare_data import load_prepared_serves
+from prepare_data import load_raw_serves, prepare_all_serves
 
-DATA_DIR = os.path.join(
+MULTI_DIR = os.path.join(
     os.path.dirname(__file__), "..", "plotting", "markers", "unmarked_edited"
 )
-OUT_PATH = os.path.join(os.path.dirname(__file__), "barycenter.npy")
+INDIVIDUAL_DIR = os.path.join(
+    os.path.dirname(__file__), "..", "plotting", "markers", "individual"
+)
+OUT_PATH = os.path.join(os.path.dirname(__file__), "barycenter.npz")
 
 
 def _dba_update(barycenter, arrays):
@@ -37,18 +40,23 @@ def _dba_update(barycenter, arrays):
     return new_bc
 
 
-def compute_barycenter(dirpath=DATA_DIR, out_path=OUT_PATH, n_iter=30):
-    """Load all serves, compute the DTW barycenter via DBA, and save it.
+def compute_barycenter(multi_dir=MULTI_DIR, individual_dir=INDIVIDUAL_DIR, out_path=OUT_PATH, n_iter=30):
+    """Load all serves from both data sources, compute the DTW barycenter via DBA, and save it.
 
     Args:
-        dirpath: folder of multi-marker Vicon CSVs (unmarked_edited)
+        multi_dir: folder of multi-marker Vicon CSVs (unmarked_edited)
+        individual_dir: folder of per-serve subdirectories with per-marker CSVs (individual)
         out_path: .npy file to write the barycenter to
         n_iter: number of DBA iterations (default 30)
 
     Returns:
         barycenter as np.ndarray of shape (n_frames, n_features)
     """
-    arrays = load_prepared_serves(dirpath)
+    raw = (
+        load_raw_serves(multi_dir, mode="multi", skip_trim=False)
+        + load_raw_serves(individual_dir, mode="individual", skip_trim=True)
+    )
+    arrays, common_markers = prepare_all_serves(raw)
     print(f"Loaded {len(arrays)} valid serves")
 
     # Initialise with the series closest to the median length to avoid
@@ -62,7 +70,7 @@ def compute_barycenter(dirpath=DATA_DIR, out_path=OUT_PATH, n_iter=30):
         print(f"  DBA iteration {i + 1}/{n_iter}")
 
     print(f"Barycenter shape: {barycenter.shape}")
-    np.save(out_path, barycenter)
+    np.savez(out_path, barycenter=barycenter, markers=common_markers)
     print(f"Saved to {out_path}")
 
     return barycenter

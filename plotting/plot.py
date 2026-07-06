@@ -58,8 +58,8 @@ def main() -> None:
     names = marker_names(markers)
     x_lim, y_lim, z_lim = compute_axis_limits(markers)
     colors = marker_color_map(names)
-
     state = {"speed": snap_speed(args.speed), "ani": None}
+
     fig = plt.figure(figsize=(10, 6))
     ax = fig.add_subplot(111, projection="3d")
 
