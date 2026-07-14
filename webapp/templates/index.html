@@ -242,7 +242,7 @@
       <a href="{{ url_for('myprogress') }}">My Progress</a>
 
       <!-- Player Style Dropdown -->
-      
+         <!-- 
       <div class="nav-dropdown" id="playerDropdown">
         <button class="nav-dropdown-btn" id="dropdownBtn" onclick="toggleDropdown()">
           <span id="dropdownLabel">Model Style</span>
@@ -251,34 +251,7 @@
         
         <div class="dropdown-menu">
           <div class="dropdown-label">Choose a player to model</div>
-          <div class="dropdown-players">
-            <div class="dp-card" onclick="selectPlayer(this, 'A. Sabalenka')">
-              <div class="dp-avatar"><img src="/static/player1.png" alt="Sabalenka"></div>
-              <div class="dp-info">
-                <div class="dp-name">Sabalenka</div>
-                <div class="dp-style">Power Baseline</div>
-              </div>
-              <span class="dp-check">✓</span>
-            </div>
-            <!--
-            <div class="dp-card" onclick="selectPlayer(this, 'C. Alcaraz')">
-              <div class="dp-avatar"><img src="/static/player2.png" alt="Alcaraz"></div>
-              <div class="dp-info">
-                <div class="dp-name">Alcaraz</div>
-                <div class="dp-style">Explosive Serve</div>
-              </div>
-              <span class="dp-check">✓</span>
-            </div>
-            -->
-            <!--
-            <div class="dp-card" onclick="selectPlayer(this, 'I. Swiatek')">
-              <div class="dp-avatar"><img src="/static/player3.png" alt="Swiatek"></div>
-              <div class="dp-info">
-                <div class="dp-name">Swiatek</div>
-                <div class="dp-style">Topspin Master</div>
-              </div>
-              <span class="dp-check">✓</span>
-            </div> -->
+          <div class="dropdown-players">         
             <div class="dp-card" onclick="selectPlayer(this, 'Maxey')">
               <div class="dp-avatar"><img src="/static/player4.png" alt="Shelton"></div>
               <div class="dp-info">
@@ -289,9 +262,7 @@
             </div>
           </div>
         </div>
-      </div>
-      
-      <span class="nav-user">{{ user }}</span>
+      </div> -->
       <a href="{{ url_for('logout') }}" class="logout">Logout</a>
     </div>
   </nav>

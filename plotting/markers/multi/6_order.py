@@ -1,0 +1,16 @@
+MARKER_ORDER = [
+    "right_elbow",  # Marker_1
+    "head",  # Marker_2
+    "right_knee",  # Marker_3
+    "right_foot",  # Marker_4
+    "chest",  # Marker_5
+    "left_hand",  # Marker_6
+    "left_shoulder",  # Marker_7
+    "right_hand",  # Marker_8
+    "right_shoulder",  # Marker_9
+    "left_knee",  # Marker_10
+    "left_foot",  # Marker_11
+    "right_hip",  # Marker_12
+    "left_hip",  # Marker_13
+    "left_elbow",  # Marker_14
+]

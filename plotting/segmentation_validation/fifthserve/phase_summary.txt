@@ -1,0 +1,19 @@
+Serve: fifthserve
+
+Start_Stance: Vicon frames 1-237  (237 frames)
+Release: Vicon frames 238-405  (168 frames)
+Loading: Vicon frames 406-410  (5 frames)
+Cocking: Vicon frames 411-415  (5 frames)
+Acceleration: Vicon frames 416-421  (6 frames)
+Contact: Vicon frames 422-422  (1 frames)
+Deceleration: Vicon frames 423-454  (32 frames)
+Finish: Vicon frames 455-707  (253 frames)
+
+Events:
+  First Movement: frame 238  conf=0.12
+  Peak Hand Height: frame 406  conf=1.00
+  Maximum Knee Bend: frame 411  conf=0.26
+  Maximum Shoulder Rotation: frame 416  conf=0.87
+  Peak Velocity (Contact Proxy): frame 422  conf=1.00
+  Sustained Velocity Decrease: frame 435  conf=0.50
+  Stabilization: frame 455  conf=0.76
