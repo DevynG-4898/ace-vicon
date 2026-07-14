@@ -13,7 +13,7 @@ import re
 matplotlib.use('Agg')
 
 app = Flask(__name__)
-app.secret_key = "tennis_secret_key_change_in_production"
+app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key")
 
 UPLOAD_FOLDER = "uploads"
 USERS_FILE = "users.json"
