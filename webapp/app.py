@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from model import compute_similarity_from_csv, compute_similarity_from_video
+from supabase_helper import supabase
 from racket_detector import detect_racket
 import matplotlib.pyplot as plt
 import os
