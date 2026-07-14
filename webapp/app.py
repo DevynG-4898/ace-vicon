@@ -2,8 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from model import compute_similarity_from_csv, compute_similarity_from_video
 from supabase_helper import supabase
 
-# Racket detection uses OpenCV. If OpenCV is missing, do not crash the whole web app at startup.
-# Render deployment should still include opencv-python-headless in requirements.txt for video checks.
+# Racket detection uses OpenCV. If OpenCV is missing, it wont crash the whole web app at startup.
 try:
     from racket_detector import detect_racket
 except Exception as import_error:
