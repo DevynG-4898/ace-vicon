@@ -7,3 +7,4 @@ numpy
 matplotlib
 scipy
 opencv-python-headless
+ultralytics
