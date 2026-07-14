@@ -1,0 +1,8 @@
+Flask
+gunicorn
+supabase
+python-dotenv
+pandas
+numpy
+matplotlib
+scipy
