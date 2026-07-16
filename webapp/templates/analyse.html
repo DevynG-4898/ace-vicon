@@ -109,6 +109,144 @@
         margin-top: 0.5rem;
       }
 
+      /* Player card */
+      .player-card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1.5rem;
+        margin-top: 1.5rem;
+        padding: 1rem 1.5rem;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+      }
+      .player-card-left {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+      }
+      .player-avatar {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        object-fit: cover;
+        background: rgba(74, 222, 128, 0.12);
+        border: 2px solid var(--green-dim);
+      }
+      .player-avatar-fallback {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: rgba(74, 222, 128, 0.12);
+        border: 2px solid var(--green-dim);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: "Anton", sans-serif;
+        font-size: 1.3rem;
+        color: var(--green);
+      }
+      .player-card-label {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: var(--muted);
+        margin-bottom: 0.15rem;
+      }
+      .player-card-name {
+        font-family: "Anton", sans-serif;
+        font-size: 1.3rem;
+        letter-spacing: 0.5px;
+      }
+      .player-card-style {
+        display: inline-block;
+        margin-top: 0.25rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--green);
+        background: rgba(74, 222, 128, 0.1);
+        padding: 0.15rem 0.6rem;
+        border-radius: 20px;
+      }
+      .player-card-change {
+        color: var(--muted);
+        text-decoration: none;
+        font-size: 0.85rem;
+        font-weight: 600;
+        padding: 0.5rem 1rem;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        transition: all 0.2s;
+        white-space: nowrap;
+      }
+      .player-card-change:hover {
+        color: var(--green);
+        border-color: var(--green-dim);
+      }
+
+      /* Inline player picker — card style */
+      .player-picker {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 0.75rem;
+        margin-top: 1.25rem;
+      }
+      .player-option {
+        display: flex;
+        align-items: center;
+        gap: 0.85rem;
+        background: var(--surface2);
+        border: 2px solid var(--border);
+        border-radius: 14px;
+        padding: 0.85rem 1rem;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .player-option:hover {
+        border-color: var(--green-dim);
+      }
+      .player-option.selected {
+        border-color: var(--green);
+        background: rgba(74, 222, 128, 0.06);
+      }
+      .player-option-avatar {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        object-fit: cover;
+        background: rgba(74, 222, 128, 0.12);
+        border: 2px solid var(--green-dim);
+        flex-shrink: 0;
+      }
+      .player-option-avatar-fallback {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: rgba(74, 222, 128, 0.12);
+        border: 2px solid var(--green-dim);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: "Anton", sans-serif;
+        font-size: 1rem;
+        color: var(--green);
+        flex-shrink: 0;
+      }
+      .player-option-info {
+        flex: 1;
+        min-width: 0;
+      }
+      .player-option-name {
+        font-weight: 600;
+        font-size: 0.95rem;
+      }
+      .player-option-style {
+        font-size: 0.78rem;
+        color: var(--muted);
+        margin-top: 0.1rem;
+      }
+
       .main {
         padding: 2.5rem 3rem;
       }
@@ -172,14 +310,6 @@
         border-radius: 10px;
         cursor: pointer;
       }
-
-      .reference-box {
-        margin-top: 2rem;
-        padding: 1.5rem;
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: 12px;
-      }
     </style>
   </head>
   <body>
@@ -198,9 +328,42 @@
     <div class="page">
       <div class="page-banner">
         <h1 class="page-title">ANALYSE YOUR SERVE</h1>
-        <p class="page-sub">
-          Upload your serve to serve like your favorite player.
-        </p>
+        <div class="player-card">
+          <div class="player-card-left">
+            {% if selected_player.avatar %}
+              <img class="player-avatar" id="cardAvatar" src="{{ url_for('static', filename=selected_player.avatar) }}" alt="{{ selected_player.name }}">
+            {% else %}
+              <div class="player-avatar-fallback" id="cardAvatarFallback">{{ selected_player.name[:1] }}{{ selected_player.name.split('.')[-1][:1] if '.' in selected_player.name else '' }}</div>
+            {% endif %}
+            <div>
+              <div class="player-card-label">Comparing against</div>
+              <div class="player-card-name" id="cardName">{{ selected_player.name }}</div>
+              <span class="player-card-style" id="cardStyle">{{ selected_player.style }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="player-picker">
+          {% for key, player in players.items() %}
+            <div
+              class="player-option {% if key == selected_player_key %}selected{% endif %}"
+              data-key="{{ key }}"
+              data-name="{{ player.name }}"
+              data-style="{{ player.style }}"
+              {% if player.avatar %}data-avatar="{{ url_for('static', filename=player.avatar) }}"{% endif %}
+            >
+              {% if player.avatar %}
+                <img class="player-option-avatar" src="{{ url_for('static', filename=player.avatar) }}" alt="{{ player.name }}">
+              {% else %}
+                <div class="player-option-avatar-fallback">{{ player.name[:1] }}{{ player.name.split('.')[-1][:1] if '.' in player.name else '' }}</div>
+              {% endif %}
+              <div class="player-option-info">
+                <div class="player-option-name">{{ player.name }}</div>
+                <div class="player-option-style">{{ player.style }}</div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
       </div>
 
       <div class="main" style="padding-bottom: 0;">
@@ -218,6 +381,8 @@
         method="POST"
         enctype="multipart/form-data"
       >
+        <input type="hidden" name="player_key" value="{{ selected_player_key }}">
+
         <div class="main">
           <div class="upload-box">
             <input
@@ -228,8 +393,8 @@
               required
             />
             <div class="upload-icon">⬆️</div>
-            <h3>UPLOAD YOUR SERVE VIDEO</h3>
-            <p>Upload your serve video to get detailed feedback</p>
+            <h3>UPLOAD YOUR VIDEO</h3>
+            <p> Get detailed feedback on your serve</p>
           </div>
 
           <div class="selected-name" id="selectedName"></div>
@@ -237,16 +402,46 @@
           <button type="submit" class="btn-submit" id="submitBtn" disabled>
             SELECT A FILE TO CONTINUE
           </button>
-
-          <div class="reference-box">
-            <strong>Reference Model:</strong><br />
-            Your serve will be compared against your selected player.
-          </div>
         </div>
       </form>
     </div>
 
     <script>
+      const cardName = document.getElementById("cardName");
+      const cardStyle = document.getElementById("cardStyle");
+      const cardAvatarWrap = document.querySelector(".player-card-left");
+      const playerKeyInput = document.querySelector('input[name="player_key"]');
+      const options = document.querySelectorAll(".player-option");
+
+      options.forEach((option) => {
+        option.addEventListener("click", () => {
+          options.forEach((o) => o.classList.remove("selected"));
+          option.classList.add("selected");
+
+          cardName.textContent = option.dataset.name;
+          cardStyle.textContent = option.dataset.style;
+          playerKeyInput.value = option.dataset.key;
+
+          const existingAvatar = cardAvatarWrap.querySelector("img, .player-avatar-fallback");
+          if (existingAvatar) existingAvatar.remove();
+
+          let avatarEl;
+          if (option.dataset.avatar) {
+            avatarEl = document.createElement("img");
+            avatarEl.className = "player-avatar";
+            avatarEl.src = option.dataset.avatar;
+            avatarEl.alt = option.dataset.name;
+          } else {
+            avatarEl = document.createElement("div");
+            avatarEl.className = "player-avatar-fallback";
+            const parts = option.dataset.name.split(".");
+            avatarEl.textContent =
+              option.dataset.name[0] + (parts.length > 1 ? parts[parts.length - 1][0] : "");
+          }
+          cardAvatarWrap.insertBefore(avatarEl, cardAvatarWrap.firstChild);
+        });
+      });
+
       const fileInput = document.getElementById("fileInput");
       const selectedName = document.getElementById("selectedName");
       const submitBtn = document.getElementById("submitBtn");
