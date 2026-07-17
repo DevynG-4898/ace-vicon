@@ -146,6 +146,20 @@ def login_required():
     return "user" in session and "user_id" in session
 
 
+def restore_supabase_session():
+    """Attach the current Flask user's Supabase token before RLS-protected queries."""
+    access_token = session.get("access_token")
+    refresh_token = session.get("refresh_token")
+
+    if not access_token or not refresh_token:
+        return
+
+    try:
+        supabase.auth.set_session(access_token, refresh_token)
+    except Exception as e:
+        print(f"SUPABASE SESSION RESTORE ERROR: {e}")
+
+
 # ── GRAPH FUNCTION ─────────────────────────────────────────
 
 def create_plot(user_traj, reference_traj):
@@ -192,6 +206,7 @@ def login():
             session["user"] = email
             session["user_id"] = response.user.id
             session["access_token"] = response.session.access_token
+            session["refresh_token"] = response.session.refresh_token
 
             return redirect(url_for("home"))
 
@@ -231,11 +246,16 @@ def register():
                 flash("Could not create account")
                 return render_template("register.html")
 
+            # If email confirmation is enabled in Supabase, sign_up returns a user
+            # but no active session. Do not treat that as logged in yet.
+            if response.session is None:
+                flash("Account created. Please check your email to confirm your account before logging in.")
+                return redirect(url_for("login"))
+
             session["user"] = email
             session["user_id"] = response.user.id
-
-            if response.session:
-                session["access_token"] = response.session.access_token
+            session["access_token"] = response.session.access_token
+            session["refresh_token"] = response.session.refresh_token
 
             return redirect(url_for("home"))
 
@@ -278,6 +298,8 @@ def myprogress():
     if not login_required():
         return redirect(url_for("login"))
 
+    restore_supabase_session()
+
     try:
         sessions = get_user_sessions(session["user_id"])
     except Exception as e:
@@ -314,6 +336,8 @@ def myprogress():
 def upload():
     if not login_required():
         return redirect(url_for("login"))
+
+    restore_supabase_session()
 
     file = request.files.get("media")
 
