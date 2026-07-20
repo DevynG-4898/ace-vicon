@@ -234,11 +234,16 @@
 
           <div class="selected-name" id="selectedName"></div>
 
+          <label style="display:flex; align-items:center; gap:0.6rem; margin-top:1.25rem; color: var(--text); font-size:0.9rem; cursor:pointer;">
+            <input type="checkbox" name="export_landmarks" id="exportLandmarks" style="width:1.1rem; height:1.1rem;" />
+            Export raw pose coordinates (CSV) instead of a similarity score
+          </label>
+
           <button type="submit" class="btn-submit" id="submitBtn" disabled>
             SELECT A FILE TO CONTINUE
           </button>
 
-          <div class="reference-box">
+          <div class="reference-box" id="referenceBox">
             <strong>Reference Model:</strong><br />
             Your serve will be compared against your selected player.
           </div>
@@ -250,13 +255,27 @@
       const fileInput = document.getElementById("fileInput");
       const selectedName = document.getElementById("selectedName");
       const submitBtn = document.getElementById("submitBtn");
+      const exportLandmarks = document.getElementById("exportLandmarks");
+      const referenceBox = document.getElementById("referenceBox");
+
+      function updateSubmitLabel() {
+        if (!fileInput.files[0]) return;
+        submitBtn.textContent = exportLandmarks.checked
+          ? "DOWNLOAD COORDINATES CSV →"
+          : "ANALYSE MY SERVE →";
+      }
 
       fileInput.addEventListener("change", () => {
         if (fileInput.files[0]) {
           selectedName.textContent = "✓ " + fileInput.files[0].name;
           submitBtn.disabled = false;
-          submitBtn.textContent = "ANALYSE MY SERVE →";
+          updateSubmitLabel();
         }
+      });
+
+      exportLandmarks.addEventListener("change", () => {
+        referenceBox.style.display = exportLandmarks.checked ? "none" : "block";
+        updateSubmitLabel();
       });
     </script>
   </body>

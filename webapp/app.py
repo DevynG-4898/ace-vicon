@@ -1,5 +1,9 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from fileinput import filename
+
+from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file
 from model import compute_similarity_from_csv, compute_similarity_from_video
+# import line — add the new function
+from video_pose import video_to_world_landmarks_csv, video_to_reference_format_csv 
 from racket_detector import detect_racket
 import matplotlib.pyplot as plt
 import os
@@ -296,6 +300,28 @@ def upload():
             print(f"RACKET CHECK FAILED for {filename}: {details}")
             flash("We couldn't detect a tennis racket in your video. Please upload a video of your serve.")
             return redirect(url_for("analyse"))
+
+    # ── RAW COORDINATES MODE ─────────────────────────────────
+    # If the user checked "export coordinates instead of a score", skip
+    # the angle/DTW scoring pipeline entirely and hand back a CSV of
+    # MediaPipe's pose_world_landmarks (x/y/z/visibility per joint per
+    # frame). Only applies to video uploads — a CSV upload is already
+    # raw data, not something to re-extract landmarks from.
+    if request.form.get("export_landmarks") == "on":
+        if ext not in VIDEO_EXTENSIONS:
+            flash("Coordinate export only applies to video uploads.")
+            return redirect(url_for("analyse"))
+        try:
+            csv_path = video_to_reference_format_csv(save_path)
+        except Exception as e:
+            print(f"LANDMARK EXPORT ERROR: {e}")
+            import traceback
+            traceback.print_exc()
+            flash(f"Error extracting coordinates: {str(e)}")
+            return redirect(url_for("analyse"))
+
+        download_name = f"{os.path.splitext(filename)[0]}_reference_format.csv"  # was: _world_landmarks.csv
+        return send_file(csv_path, as_attachment=True, download_name=download_name)
 
     try:
         if ext in CSV_EXTENSIONS:

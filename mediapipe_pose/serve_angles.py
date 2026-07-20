@@ -63,7 +63,7 @@ class TennisServeAnalyzer:
     NAN = float('nan')
 
     def __init__(self, pose_landmarks, hand: str = 'right',
-                 visibility_threshold: float = 0.5):
+                 visibility_threshold: float = 0.3):
         """
         Args:
             pose_landmarks:        MediaPipe pose landmark list for one person.
