@@ -63,6 +63,12 @@ LANDMARK_NAMES = [
 # annotated video) go. Lives inside webapp/, next to this file.
 ANALYSIS_OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "analysis_outputs")
 
+# Where reference-format coordinate CSVs from webapp uploads go — inside
+# mediapipe_pose/serve_recs/, alongside your other recorded/processed
+# serves, so they're all browsable in one place instead of split across
+# webapp/analysis_outputs/.
+SERVE_RECS_DIR = os.path.join(PROJECT_ROOT, "mediapipe_pose", "serve_recs")
+
 
 def video_to_marker_trajectory(video_path, hand: str = 'right', frame_step: int = 1,
                                 return_angles_df: bool = False,
@@ -131,11 +137,19 @@ def video_to_marker_trajectory(video_path, hand: str = 'right', frame_step: int 
     return trajectory
 
 
-def video_to_world_landmarks_csv(video_path, frame_step: int = 1) -> str:
+def video_to_world_landmarks_csv(video_path, frame_step: int = 1, scale: float = 1000.0) -> str:
     """
     Run MediaPipe pose detection on an uploaded video and write the raw
-    pose_world_landmarks (metric-scale, hip-centered x/y/z in meters, plus
-    per-landmark visibility) straight to CSV — no angle math involved.
+    pose_world_landmarks (x/y/z per landmark, plus per-landmark visibility)
+    straight to CSV — no angle math involved.
+
+    MediaPipe's pose_world_landmarks are metric-scale, hip-centered, and in
+    METERS. `scale` (default 1000) converts to millimeters before writing,
+    since format_data_mediapipe.py (the next step in the grading pipeline)
+    assumes its input coordinates are already in mm — its fixed thresholds
+    (e.g. PARALLEL_THRESHOLD = 5.0mm in find_snapshots.py) are only
+    meaningful at that scale. Pass scale=1.0 if you need raw meters for
+    some other purpose.
 
     This is the "give me coordinates instead of angles" path: it bypasses
     TennisServeAnalyzer entirely, unlike video_to_marker_trajectory().
@@ -191,7 +205,7 @@ def video_to_world_landmarks_csv(video_path, frame_step: int = 1) -> str:
                     poses_found += 1
                     world_landmarks = result.pose_world_landmarks[0]
                     for lm in world_landmarks:
-                        row += [f"{lm.x:.6f}", f"{lm.y:.6f}", f"{lm.z:.6f}", f"{lm.visibility:.3f}"]
+                        row += [f"{lm.x * scale:.6f}", f"{lm.y * scale:.6f}", f"{lm.z * scale:.6f}", f"{lm.visibility:.3f}"]
                 else:
                     row += ["nan"] * (len(LANDMARK_NAMES) * 4)
 
@@ -237,14 +251,16 @@ def video_to_reference_format_csv(video_path, frame_step: int = 1,
           matching how the reference CSV leaves occluded points blank.
 
     Returns:
-        Path to the written CSV (saved under ANALYSIS_OUTPUT_DIR so it
-        persists alongside the other per-upload outputs).
+        Path to the written CSV. Saved under SERVE_RECS_DIR
+        (mediapipe_pose/serve_recs/<video_name>_<timestamp>/reference_format.csv),
+        alongside your other recorded/processed serves — not under
+        webapp/analysis_outputs/.
     """
-    os.makedirs(ANALYSIS_OUTPUT_DIR, exist_ok=True)
+    os.makedirs(SERVE_RECS_DIR, exist_ok=True)
 
     base_name = os.path.splitext(os.path.basename(video_path))[0]
     ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    out_dir = os.path.join(ANALYSIS_OUTPUT_DIR, f"{base_name}_{ts}")
+    out_dir = os.path.join(SERVE_RECS_DIR, f"{base_name}_{ts}")
     os.makedirs(out_dir, exist_ok=True)
     csv_path = os.path.join(out_dir, "reference_format.csv")
 

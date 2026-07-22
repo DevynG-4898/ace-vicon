@@ -1,8 +1,10 @@
 from fileinput import filename
-
+from grading_pipeline import analyze_and_grade_video
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file
 from model import compute_similarity_from_csv, compute_similarity_from_video
 # import line — add the new function
+from grading_pipeline import analyze_and_grade_video
+from grade_snapshots import SNAPSHOT_WEIGHTS
 from video_pose import video_to_world_landmarks_csv, video_to_reference_format_csv 
 from racket_detector import detect_racket
 import matplotlib.pyplot as plt
@@ -301,40 +303,28 @@ def upload():
             flash("We couldn't detect a tennis racket in your video. Please upload a video of your serve.")
             return redirect(url_for("analyse"))
 
-    # ── RAW COORDINATES MODE ─────────────────────────────────
-    # If the user checked "export coordinates instead of a score", skip
-    # the angle/DTW scoring pipeline entirely and hand back a CSV of
-    # MediaPipe's pose_world_landmarks (x/y/z/visibility per joint per
-    # frame). Only applies to video uploads — a CSV upload is already
-    # raw data, not something to re-extract landmarks from.
-    if request.form.get("export_landmarks") == "on":
-        if ext not in VIDEO_EXTENSIONS:
-            flash("Coordinate export only applies to video uploads.")
-            return redirect(url_for("analyse"))
-        try:
-            csv_path = video_to_reference_format_csv(save_path)
-        except Exception as e:
-            print(f"LANDMARK EXPORT ERROR: {e}")
-            import traceback
-            traceback.print_exc()
-            flash(f"Error extracting coordinates: {str(e)}")
-            return redirect(url_for("analyse"))
-
-        download_name = f"{os.path.splitext(filename)[0]}_reference_format.csv"  # was: _world_landmarks.csv
-        return send_file(csv_path, as_attachment=True, download_name=download_name)
-
+    # ── SCORING ───────────────────────────────────────────────
+    # Video uploads go through the full snapshot-based grading pipeline:
+    # raw MediaPipe landmarks -> format_data_mediapipe -> find_snapshots
+    # -> grade_snapshots, compared against the standing reference serve
+    # (see grading_pipeline.build_reference_serve() / REFERENCE_FORMATTED_CSV).
+    #
+    # CSV uploads still go through the older angle/DTW similarity path for
+    # now -- they'd need their own run through format_data.py (the raw,
+    # unmarked-Vicon-track version) + find_snapshots.py before they could
+    # use grade_snapshots.py the same way a video does. Left as a follow-up.
     try:
         if ext in CSV_EXTENSIONS:
             score, avg_z, ref_mean, user_traj = compute_similarity_from_csv(
                 save_path, REFERENCE_FILES
             )
+            score = round(score, 1)
+            plot_path = create_plot(user_traj, ref_mean)
+            grade_results = None
         else:
-            score, avg_z, ref_mean, user_traj = compute_similarity_from_video(
-                save_path, REFERENCE_FILES
-            )
-
-        score = round(score, 1)
-        plot_path = create_plot(user_traj, ref_mean)
+            grade_results = analyze_and_grade_video(save_path)
+            score = grade_results["overall_score"]
+            plot_path = None
 
     except Exception as e:
         print(f"UPLOAD ERROR: {e}")
@@ -361,7 +351,11 @@ def upload():
         player=feedback,
         score=score,
         plot_path=plot_path,
+        grade_results=grade_results,
+        SNAPSHOT_WEIGHTS=SNAPSHOT_WEIGHTS,   # <-- add this
+
     )
+
 
 
 @app.route("/logout")
