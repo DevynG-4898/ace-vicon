@@ -47,7 +47,12 @@
     .page-sub { color: var(--muted); font-size: 0.95rem; margin-top: 0.5rem; }
 
     /* CONTENT */
-    .content { padding: 2.5rem 3rem 4rem; max-width: 1100px; }
+    .content {
+  padding: 2.5rem 3rem 4rem;
+  max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
+}
 
     /* STATS ROW */
     .stats-row {
@@ -77,9 +82,16 @@
 
     /* EMPTY STATE */
     .empty {
-      text-align: center; padding: 5rem 2rem;
-      animation: fadeUp 0.5s ease both;
-    }
+  text-align: center;
+  padding: 5rem 2rem;
+  animation: fadeUp 0.5s ease both;
+
+  min-height: calc(100vh - 260px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
     .empty-icon { font-size: 4rem; margin-bottom: 1rem; }
     .empty h3 { font-family: 'Anton', sans-serif; font-size: 1.8rem; letter-spacing: 2px; margin-bottom: 0.5rem; }
     .empty p { color: var(--muted); font-size: 0.95rem; margin-bottom: 2rem; }
@@ -153,6 +165,7 @@
       <a href="{{ url_for('home') }}">Home</a>
       <a href="{{ url_for('analyse') }}">Analyse</a>
       <a href="{{ url_for('myprogress') }}" class="active">My Progress</a>
+      <span class="nav-user">{{ user }}</span>
       <a href="{{ url_for('logout') }}" class="logout">Logout</a>
     </div>
   </nav>

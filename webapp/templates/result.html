@@ -1,107 +1,391 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Results — ACE</title>
-    <link
-      href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow:wght@400;500;600&display=swap"
-      rel="stylesheet"
-    />
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Results — ACE</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --green: #4ADE80;
+      --green-dim: #22c55e;
+      --amber: #facc15;
+      --orange: #fb923c;
+      --red: #f87171;
+      --bg: #080c10;
+      --surface: #0f1318;
+      --surface-2: #141a21;
+      --border: #1e2530;
+      --text: #f0f2f5;
+      --muted: #5a6470;
+    }
+    body {
+      font-family: 'Barlow', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding-top: 60px;
+      padding-bottom: 84px;
+    }
 
-    <style>
-      body {
-        font-family: "Barlow", sans-serif;
-        background: #080c10;
-        color: #f0f2f5;
-      }
+    /* ── NAV ── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+      height: 60px; display: flex; align-items: center;
+      justify-content: space-between; padding: 0 2.5rem;
+      background: rgba(8,12,16,0.88); backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .nav-logo { font-family: 'Anton', sans-serif; font-size: 1.5rem; letter-spacing: 3px; text-decoration: none; }
+    .nav-logo .t { color: var(--green); }
+    .nav-links { display: flex; align-items: center; gap: 0.2rem; }
+    .nav-links a {
+      color: var(--muted); text-decoration: none; font-size: 0.875rem;
+      font-weight: 600; padding: 0.4rem 0.9rem; border-radius: 6px; transition: all 0.2s;
+    }
+    .nav-links a:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+    .nav-links a.logout { color: #f87171; }
 
-      .container {
-        max-width: 900px;
-        margin: auto;
-        padding: 2rem;
-      }
+    /* ── PINNED ACTION BAR ── */
+    .action-bar {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 200;
+      height: 68px; display: flex; align-items: center; justify-content: center;
+      gap: 1rem; background: rgba(8,12,16,0.92); backdrop-filter: blur(16px);
+      border-top: 1px solid rgba(255,255,255,0.06);
+    }
+    .action-bar a {
+      font-family: 'Anton', sans-serif; font-size: 0.9rem; letter-spacing: 1.5px;
+      text-decoration: none; padding: 0.7rem 1.6rem; border-radius: 10px;
+      transition: all 0.2s;
+    }
+    .action-bar .primary { background: var(--green); color: #071209; }
+    .action-bar .primary:hover { background: var(--green-dim); transform: translateY(-2px); }
+    .action-bar .secondary { background: rgba(255,255,255,0.07); color: #fff; border: 1px solid rgba(255,255,255,0.12); }
+    .action-bar .secondary:hover { background: rgba(255,255,255,0.12); transform: translateY(-2px); }
 
-      h1 {
-        font-family: "Anton";
-        letter-spacing: 2px;
-      }
+    /* ── LAYOUT ── */
+    .container { max-width: 960px; margin: 0 auto; padding: 2.5rem 2rem; }
+    h1 { font-family: 'Anton', sans-serif; letter-spacing: 2px; font-size: 2.4rem; }
+    .filename { color: var(--muted); font-size: 0.85rem; margin-top: 0.5rem; }
 
-      .score {
-        font-size: 3rem;
-        margin: 1rem 0;
-      }
+    .score-row {
+      display: flex; align-items: baseline; gap: 1rem; margin: 1.25rem 0 0.4rem;
+      flex-wrap: wrap;
+    }
+    .score-big { font-family: 'Anton', sans-serif; font-size: 3.4rem; color: var(--green); }
+    .score-of100 { font-family: 'Anton', sans-serif; font-size: 1.6rem; color: var(--muted); }
+    .grade-pill {
+      font-size: 0.8rem; font-weight: 600; color: var(--text);
+      background: var(--surface-2); border: 1px solid var(--border);
+      padding: 0.35rem 0.9rem; border-radius: 20px;
+    }
 
-      .card {
-        background: #0f1318;
-        border: 1px solid #141b17;
-        border-radius: 12px;
-        padding: 1.5rem;
-        margin-top: 1.5rem;
-      }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-top: 1.5rem;
+    }
+    .card h3 {
+      font-family: 'Anton', sans-serif; font-size: 0.95rem; letter-spacing: 1.5px;
+      margin-bottom: 1rem; color: #fff;
+    }
+    .card-sub { font-size: 0.75rem; color: var(--muted); margin-top: -0.6rem; margin-bottom: 1.1rem; }
 
-      img {
-        width: 100%;
-        max-width: 600px;
-        border-radius: 10px;
-      }
-    </style>
-  </head>
+    img { width: 100%; max-width: 600px; border-radius: 10px; display: block; }
 
-  <body>
-    <div class="container">
+    /* ── BAR CHART ── */
+    .chart-row {
+      display: flex; align-items: flex-end; gap: 0.6rem;
+      height: 200px; padding: 0 0.25rem;
+    }
+    .chart-col {
+      flex: 1; display: flex; flex-direction: column; align-items: center;
+      height: 100%; cursor: pointer; user-select: none;
+      justify-content: flex-end;
+    }
+    .chart-col.disabled { cursor: default; }
+
+    .col-score-label {
+      font-family: 'Anton', sans-serif; font-size: 0.75rem;
+      color: var(--muted); margin-bottom: 0.4rem; transition: color 0.2s;
+    }
+    .chart-col.selected .col-score-label { color: #fff; }
+
+    .col-bar-track {
+      width: 100%; max-width: 42px; flex: 1;
+      display: flex; align-items: flex-end;
+      background: var(--surface-2); border-radius: 6px 6px 3px 3px;
+      overflow: hidden; border: 1px solid var(--border);
+      transition: border-color 0.2s;
+    }
+    .chart-col:hover .col-bar-track,
+    .chart-col.selected .col-bar-track { border-color: rgba(255,255,255,0.25); }
+
+    .col-bar-fill {
+      width: 100%; border-radius: 5px 5px 0 0;
+      transition: height 0.5s ease, opacity 0.2s;
+      opacity: 0.72;
+    }
+    .chart-col:hover .col-bar-fill,
+    .chart-col.selected .col-bar-fill { opacity: 1; }
+
+    .fill-excellent { background: var(--green); }
+    .fill-good      { background: #a3e635; }
+    .fill-fair      { background: var(--amber); }
+    .fill-poor      { background: var(--red); }
+    .fill-missing   { background: var(--border); }
+
+    .col-label {
+      margin-top: 0.6rem; font-size: 0.68rem; text-align: center;
+      color: var(--muted); line-height: 1.25; max-width: 78px;
+      transition: color 0.2s;
+    }
+    .chart-col:hover .col-label,
+    .chart-col.selected .col-label { color: var(--text); }
+
+    .col-weight {
+      font-size: 0.6rem; color: var(--border); margin-top: 0.15rem;
+      letter-spacing: 0.5px;
+    }
+    .chart-col:hover .col-weight,
+    .chart-col.selected .col-weight { color: var(--muted); }
+
+    /* ── DETAIL PANEL ── */
+    .detail-panel {
+      margin-top: 1.5rem; padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+      min-height: 90px;
+    }
+    .detail-empty {
+      color: var(--muted); font-size: 0.85rem; text-align: center;
+      padding: 1.5rem 0;
+    }
+    .detail-header {
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem;
+    }
+    .detail-title { font-family: 'Anton', sans-serif; font-size: 1.1rem; letter-spacing: 1px; color: #fff; }
+    .detail-score { font-family: 'Anton', sans-serif; font-size: 1.15rem; }
+
+    .tier-excellent { color: var(--green); }
+    .tier-good      { color: #a3e635; }
+    .tier-fair      { color: var(--amber); }
+    .tier-poor      { color: var(--red); }
+    .tier-nodata    { color: var(--muted); }
+
+    .joint-list { display: flex; flex-direction: column; gap: 0.55rem; }
+    .joint-row { display: flex; align-items: center; gap: 0.6rem; font-size: 0.82rem; color: var(--muted); }
+    .joint-icon { width: 16px; text-align: center; font-weight: 700; flex-shrink: 0; }
+    .joint-name { color: var(--text); width: 130px; flex-shrink: 0; }
+    .joint-detail { color: var(--muted); }
+    .joint-feedback { font-size: 0.78rem; color: rgba(240,242,245,0.55); margin: 0.15rem 0 0 1.9rem; line-height: 1.5; }
+
+    .tips-list p { font-size: 0.9rem; color: var(--text); padding: 0.35rem 0; }
+    .tips-list p::before { content: "• "; color: var(--green); }
+    .explain-text { color: var(--muted); font-size: 0.85rem; line-height: 1.65; }
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav>
+    <a href="{{ url_for('home') }}" class="nav-logo"><span class="t">ACE</span></a>
+    <div class="nav-links">
+      <a href="{{ url_for('home') }}">Home</a>
+      <a href="{{ url_for('analyse') }}">Analyse</a>
+      <a href="{{ url_for('myprogress') }}">My Progress</a>
+      <a href="{{ url_for('logout') }}" class="logout">Logout</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div>
       <h1>YOUR RESULTS</h1>
-      <p>📎 {{ filename }}</p>
+      <p class="filename">📎 {{ filename }}</p>
+    </div>
 
-      <!-- SCORE -->
-      <div class="score">{{ score }} / 100</div>
+    <!-- SCORE -->
+    <div class="score-row">
+      <span class="score-big">{{ score }}</span>
+      <span class="score-of100">/ 100</span>
+      {% if grade_results and grade_results.overall_grade %}
+      <span class="grade-pill">{{ grade_results.overall_grade }}</span>
+      {% endif %}
+    </div>
 
-      <!-- COMPARED TO -->
-      <div class="card">
-        <strong>Compared Against:</strong><br />
-        {{ player.name }} — {{ player.style }}
+    <!-- COMPARED TO -->
+    <div class="card">
+      <h3>Compared Against</h3>
+      <p style="font-size: 0.95rem;">{{ player.name }} — {{ player.style }}</p>
+    </div>
+
+    {% if grade_results and grade_results.snapshots %}
+    <!-- PHASE BAR CHART -->
+    <div class="card">
+      <h3>Serve Phase Breakdown</h3>
+      <p class="card-sub">Click a phase to see the joint-by-joint detail</p>
+
+      <div class="chart-row" id="chartRow"></div>
+
+      <div class="detail-panel" id="detailPanel">
+        <p class="detail-empty">Select a phase above to see its breakdown.</p>
       </div>
+    </div>
+    {% endif %}
 
-      <!-- GRAPH -->
-     <div class="card">
+    <!-- GRAPH -->
+    <div class="card">
       <h3>Serve Comparison</h3>
       {% if plot_path %}
-      <img src="{{ url_for('static', filename=plot_path) }}" />
-      <p style="color: #5a6470; font-size: 0.85rem">
+      <img src="{{ url_for('static', filename=plot_path) }}" alt="Serve comparison plot">
+      <p style="color: var(--muted); font-size: 0.85rem; margin-top: 0.6rem;">
         Your serve (blue) vs reference model (Max)
       </p>
       {% else %}
-      <p style="color: #5a6470; font-size: 0.85rem">
+      <p style="color: var(--muted); font-size: 0.85rem;">
         Plot visualization coming soon.
       </p>
       {% endif %}
     </div>
 
-      <!-- TIPS -->
-      <div class="card">
-        <h3>Areas to Improve</h3>
+    <!-- TIPS -->
+    {% if player.tips %}
+    <div class="card">
+      <h3>Areas to Improve</h3>
+      <div class="tips-list">
         {% for tip in player.tips %}
-        <p>• {{ tip }}</p>
+        <p>{{ tip }}</p>
         {% endfor %}
       </div>
-
-      <!-- MODEL EXPLANATION -->
-      <div class="card">
-        <h3>How This Works</h3>
-        <p style="color: #5a6470">
-          Your serve is compared against a probabilistic model built from
-          multiple Vicon motion capture recordings of a reference player (Max).
-          The system calculates how closely your motion matches expected
-          patterns using statistical analysis.
-        </p>
-      </div>
-
-      <!-- ACTIONS -->
-      <!-- ACTIONS -->
-    <div style="margin-top: 2rem">
-      <a href="{{ url_for('analyse') }}" style="color: #ffffff; text-decoration: none;">Analyse Another</a> 
-      <span style="color: #5a6470;"> | </span>
-      <a href="{{ url_for('myprogress') }}" style="color: #fbfbfb; text-decoration: none;">My Progress</a>
     </div>
-  </body>
+    {% endif %}
+
+    <!-- MODEL EXPLANATION -->
+    <div class="card">
+      <h3>How This Works</h3>
+      <p class="explain-text">
+        Your serve is compared phase-by-phase against a reference serve captured
+        with motion tracking. Each phase — from your starting stance through
+        contact to follow-through — is scored on how closely your joint angles
+        match the reference at that moment, weighted toward the moments that
+        matter most for power and consistency.
+      </p>
+    </div>
+  </div>
+
+  <!-- PINNED ACTIONS -->
+  <div class="action-bar">
+    <a href="{{ url_for('analyse') }}" class="primary">ANALYSE ANOTHER</a>
+    <a href="{{ url_for('myprogress') }}" class="secondary">MY PROGRESS</a>
+  </div>
+
+  {% if grade_results and grade_results.snapshots %}
+  <script>
+    const snapshots = {{ grade_results.snapshots | tojson }};
+    const weights = {{ SNAPSHOT_WEIGHTS | tojson }};
+    const order = Object.keys(snapshots);
+
+    function tierClass(score) {
+      if (score >= 90) return 'excellent';
+      if (score >= 75) return 'good';
+      if (score >= 55) return 'fair';
+      return 'poor';
+    }
+    function tierLabel(tier) {
+      if (tier === 'Excellent') return { icon: '✓', cls: 'excellent' };
+      if (tier === 'Good') return { icon: '~', cls: 'good' };
+      if (tier === 'Fair') return { icon: '!', cls: 'fair' };
+      if (tier === 'Poor') return { icon: '✗', cls: 'poor' };
+      return { icon: '?', cls: 'nodata' };
+    }
+    function titleCase(s) {
+      return s.replace(/_/g, ' ').replace(/\w\S*/g, w => w[0].toUpperCase() + w.slice(1));
+    }
+
+    const chartRow = document.getElementById('chartRow');
+    const detailPanel = document.getElementById('detailPanel');
+
+    order.forEach(snap => {
+      const data = snapshots[snap];
+      const hasScore = data.snapshot_score !== null && data.snapshot_score !== undefined;
+      const score = hasScore ? data.snapshot_score : 0;
+      const cls = hasScore ? tierClass(score) : 'missing';
+      const weightPct = weights[snap] ? Math.round(weights[snap] * 100) : 0;
+
+      const col = document.createElement('div');
+      col.className = 'chart-col' + (hasScore ? '' : ' disabled');
+      col.innerHTML = `
+        <div class="col-score-label">${hasScore ? Math.round(score) : '—'}</div>
+        <div class="col-bar-track">
+          <div class="col-bar-fill fill-${cls}" style="height: ${hasScore ? score : 4}%;"></div>
+        </div>
+        <div class="col-label">${titleCase(snap)}</div>
+        <div class="col-weight">${weightPct}%</div>
+      `;
+      if (hasScore) {
+        col.addEventListener('click', () => selectPhase(snap, col));
+      }
+      chartRow.appendChild(col);
+    });
+
+    function selectPhase(snap, col) {
+      document.querySelectorAll('.chart-col').forEach(c => c.classList.remove('selected'));
+      col.classList.add('selected');
+      renderDetail(snap);
+    }
+
+    function renderDetail(snap) {
+      const data = snapshots[snap];
+      const weightPct = weights[snap] ? Math.round(weights[snap] * 100) : 0;
+      const t = tierClass(data.snapshot_score);
+
+      let jointsHtml = '';
+      Object.entries(data.joints).forEach(([jname, j]) => {
+        const label = tierLabel(j.tier);
+        const nameHtml = titleCase(jname);
+        if (j.tier === 'No data') {
+          jointsHtml += `
+            <div>
+              <div class="joint-row">
+                <span class="joint-icon tier-nodata">${label.icon}</span>
+                <span class="joint-name">${nameHtml}</span>
+                <span class="joint-detail">No data — ${j.note}</span>
+              </div>
+            </div>`;
+        } else {
+          jointsHtml += `
+            <div>
+              <div class="joint-row">
+                <span class="joint-icon tier-${label.cls}">${label.icon}</span>
+                <span class="joint-name">${nameHtml}</span>
+                <span class="joint-detail">${j.tier} — Diff ${j.diff}°</span>
+              </div>
+              ${j.feedback ? `<p class="joint-feedback">${j.feedback}</p>` : ''}
+            </div>`;
+        }
+      });
+
+      detailPanel.innerHTML = `
+        <div class="detail-header">
+          <span class="detail-title">${titleCase(snap)}</span>
+          <span class="detail-score tier-${t}">${data.snapshot_score}/100 &nbsp;·&nbsp; ${weightPct}% of grade</span>
+        </div>
+        <div class="joint-list">${jointsHtml}</div>
+      `;
+    }
+
+    // Auto-select the first scoreable phase so the panel isn't empty on load
+    const firstScoreable = order.find(s => snapshots[s].snapshot_score !== null && snapshots[s].snapshot_score !== undefined);
+    if (firstScoreable) {
+      const idx = order.indexOf(firstScoreable);
+      selectPhase(firstScoreable, chartRow.children[idx]);
+    }
+  </script>
+  {% endif %}
+
+</body>
 </html>

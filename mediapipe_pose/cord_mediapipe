@@ -1,0 +1,147 @@
+"""
+export_world_landmarks.py
+Drop this into mediapipe_pose/ (next to tennis_video_analysis.py).
+
+Processes a video frame-by-frame and writes MediaPipe's pose_world_landmarks
+(metric-scale, hip-centered x/y/z in meters, plus per-landmark visibility)
+straight to CSV — no angle math, no TennisServeAnalyzer involved.
+
+Usage:
+    python export_world_landmarks.py serve1.mp4
+    python export_world_landmarks.py serve1.mp4 serve2.mp4 serves_folder/
+"""
+
+import os
+import sys
+import csv
+import cv2
+import mediapipe as mp
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from utils import create_detector   # reuses your existing detector factory
+
+VIDEO_EXTS = {'.mp4', '.avi', '.mov', '.mkv', '.m4v'}
+
+# Standard MediaPipe Pose landmark order (0-32)
+LANDMARK_NAMES = [
+    'nose', 'left_eye_inner', 'left_eye', 'left_eye_outer',
+    'right_eye_inner', 'right_eye', 'right_eye_outer',
+    'left_ear', 'right_ear', 'mouth_left', 'mouth_right',
+    'left_shoulder', 'right_shoulder', 'left_elbow', 'right_elbow',
+    'left_wrist', 'right_wrist', 'left_pinky', 'right_pinky',
+    'left_index', 'right_index', 'left_thumb', 'right_thumb',
+    'left_hip', 'right_hip', 'left_knee', 'right_knee',
+    'left_ankle', 'right_ankle', 'left_heel', 'right_heel',
+    'left_foot_index', 'right_foot_index',
+]
+
+
+def build_header() -> list[str]:
+    header = ['frame', 'time_s']
+    for name in LANDMARK_NAMES:
+        header += [f'{name}_x', f'{name}_y', f'{name}_z', f'{name}_visibility']
+    return header
+
+
+def process_video_landmarks(input_path: str, csv_path: str, frame_step: int = 1) -> str:
+    print(f"\nOpening video: {input_path}")
+    cap = cv2.VideoCapture(input_path)
+    if not cap.isOpened():
+        raise IOError(f"Could not open video: {input_path}")
+
+    fps = int(cap.get(cv2.CAP_PROP_FPS)) or 30
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    print(f"  FPS: {fps}  Frames: {total_frames}  Step: every {frame_step}")
+
+    detector = create_detector(mode='video')
+    frame_count = 0
+    poses_found = 0
+
+    with open(csv_path, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(build_header())
+
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            frame_count += 1
+            if frame_count % frame_step != 0:
+                continue
+
+            time_sec = frame_count / fps
+            timestamp_ms = int(frame_count * (1000 / fps))
+
+            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
+            result = detector.detect_for_video(mp_image, timestamp_ms)
+
+            row = [frame_count, f"{time_sec:.3f}"]
+
+            if result.pose_world_landmarks:
+                poses_found += 1
+                world_landmarks = result.pose_world_landmarks[0]  # first detected person
+                for lm in world_landmarks:
+                    row += [f"{lm.x:.6f}", f"{lm.y:.6f}", f"{lm.z:.6f}", f"{lm.visibility:.3f}"]
+            else:
+                # no pose this frame -> NaN across all landmark columns
+                row += ["nan"] * (len(LANDMARK_NAMES) * 4)
+
+            writer.writerow(row)
+
+            if frame_count % (fps * 2) == 0 and total_frames:
+                print(f"  {frame_count / total_frames * 100:.1f}%  ({frame_count}/{total_frames})")
+
+    cap.release()
+    detector.close()
+
+    rate = poses_found / max(frame_count // frame_step, 1) * 100
+    print(f"\nDone. Poses detected in {poses_found} frames ({rate:.1f}%).")
+    print(f"CSV written: {csv_path}")
+    return csv_path
+
+
+def collect_videos(args: list[str]) -> list[str]:
+    videos = []
+    for arg in args:
+        if os.path.isdir(arg):
+            for f in sorted(os.listdir(arg)):
+                if os.path.splitext(f)[1].lower() in VIDEO_EXTS:
+                    videos.append(os.path.join(arg, f))
+        elif os.path.isfile(arg) and os.path.splitext(arg)[1].lower() in VIDEO_EXTS:
+            videos.append(arg)
+        else:
+            print(f"  Skipping (not found/unsupported): {arg}")
+    return videos
+
+
+def main():
+    if len(sys.argv) < 2:
+        sys.exit(
+            "Usage:\n"
+            "  python export_world_landmarks.py serve1.mp4\n"
+            "  python export_world_landmarks.py serves_folder/"
+        )
+
+    videos = collect_videos(sys.argv[1:])
+    if not videos:
+        sys.exit("No valid video files found.")
+
+    for i, video_path in enumerate(videos, 1):
+        base = os.path.splitext(os.path.basename(video_path))[0]
+        video_dir = os.path.dirname(os.path.abspath(video_path))
+        out_dir = os.path.join(video_dir, "outputs", base)
+        os.makedirs(out_dir, exist_ok=True)
+        csv_path = os.path.join(out_dir, f"{base}_world_landmarks.csv")
+
+        print(f"[{i}/{len(videos)}] {video_path} -> {csv_path}")
+        try:
+            process_video_landmarks(video_path, csv_path)
+        except Exception as e:
+            print(f"  Failed: {e}")
+
+
+if __name__ == "__main__":
+    main()
+    
