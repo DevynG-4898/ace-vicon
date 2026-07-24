@@ -8,3 +8,4 @@ matplotlib
 scipy
 opencv-python-headless
 ultralytics
+mediapipe==0.10.35
