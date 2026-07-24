@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from skeleton_viz import DEFAULT_INTERVAL_MS
+from src.motionbert.skeleton_viz import DEFAULT_INTERVAL_MS
 
 # Allowed interactive / CLI speed multipliers
 ALLOWED_SPEEDS: tuple[int, ...] = (1, 2, 4, 8)

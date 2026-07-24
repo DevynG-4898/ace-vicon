@@ -15,14 +15,14 @@ PLOTTING_DIR = Path(__file__).resolve().parents[2] / "plotting"
 if str(PLOTTING_DIR) not in sys.path:
     sys.path.insert(0, str(PLOTTING_DIR))
 
-from playback import (  # noqa: E402
+from src.motionbert.playback import (  # noqa: E402
     ALLOWED_SPEEDS,
     format_playback_label,
     snap_speed,
     speed_down,
     speed_up,
 )
-from skeleton_viz import DEFAULT_INTERVAL_MS, compute_axis_limits, draw_skeleton, marker_color_map, marker_names  # noqa: E402
+from src.motionbert.skeleton_viz import DEFAULT_INTERVAL_MS, compute_axis_limits, draw_skeleton, marker_color_map, marker_names  # noqa: E402
 
 from src.motionbert.ace_adapter import load_ace_markers  # noqa: E402
 

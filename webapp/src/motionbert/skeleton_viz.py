@@ -14,7 +14,7 @@ _DTW_DIR = os.path.join(os.path.dirname(__file__), "..", "dtw")
 if _DTW_DIR not in sys.path:
     sys.path.insert(0, _DTW_DIR)
 
-from load_data import FILENAME_TO_MARKER, load_single_serve  # noqa: E402
+from src.markers.load_data import FILENAME_TO_MARKER, load_single_serve  # noqa: E402
 
 BONES: list[tuple[str, str]] = [
     ("head", "chest"),
