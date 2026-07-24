@@ -299,12 +299,8 @@ def find_key_serve_moments(csv_path: str):
                 try:
                     data.append({
                         'frame':        int(row['frame']),
-                        'time':         float(row['time_s']),
                         'elbow':        float(row['elbow_angle']),
                         'shoulder':     float(row['shoulder_angle']),
-                        'elbow_vel':    float(row['elbow_vel'])    if row['elbow_vel']    not in ('nan', '') else 0.0,
-                        'shoulder_vel': float(row['shoulder_vel']) if row['shoulder_vel'] not in ('nan', '') else 0.0,
-                        'wrist_vel':    float(row['wrist_vel'])    if row['wrist_vel']    not in ('nan', '') else 0.0,
                         'elbow_acc':    float(row['elbow_acc'])    if row['elbow_acc']    not in ('nan', '') else 0.0,
                         'shoulder_acc': float(row['shoulder_acc']) if row['shoulder_acc'] not in ('nan', '') else 0.0,
                     })

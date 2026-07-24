@@ -47,7 +47,12 @@
     .page-sub { color: var(--muted); font-size: 0.95rem; margin-top: 0.5rem; }
 
     /* CONTENT */
-    .content { padding: 2.5rem 3rem 4rem; max-width: 1100px; }
+    .content {
+  padding: 2.5rem 3rem 4rem;
+  max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
+}
 
     /* STATS ROW */
     .stats-row {
@@ -77,9 +82,16 @@
 
     /* EMPTY STATE */
     .empty {
-      text-align: center; padding: 5rem 2rem;
-      animation: fadeUp 0.5s ease both;
-    }
+  text-align: center;
+  padding: 5rem 2rem;
+  animation: fadeUp 0.5s ease both;
+
+  min-height: calc(100vh - 260px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
     .empty-icon { font-size: 4rem; margin-bottom: 1rem; }
     .empty h3 { font-family: 'Anton', sans-serif; font-size: 1.8rem; letter-spacing: 2px; margin-bottom: 0.5rem; }
     .empty p { color: var(--muted); font-size: 0.95rem; margin-bottom: 2rem; }
@@ -119,6 +131,8 @@
     .session-row:hover { background: rgba(255,255,255,0.02); }
 
     .session-file { font-size: 0.875rem; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .session-file-link { color: var(--text); text-decoration: none; }
+    .session-file-link:hover { color: var(--green); text-decoration: underline; }
     .session-date { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
 
     .session-player { display: flex; align-items: center; gap: 0.6rem; }
@@ -153,6 +167,7 @@
       <a href="{{ url_for('home') }}">Home</a>
       <a href="{{ url_for('analyse') }}">Analyse</a>
       <a href="{{ url_for('myprogress') }}" class="active">My Progress</a>
+      <span class="nav-user">{{ user }}</span>
       <a href="{{ url_for('logout') }}" class="logout">Logout</a>
     </div>
   </nav>
@@ -178,7 +193,7 @@
           <div class="stat-card">
             <div class="stat-card-label">Average Score</div>
             <div class="stat-card-val">{{ avg_score }}</div>
-            <div class="stat-card-sub">out of 10</div>
+            <div class="stat-card-sub">out of 100</div>
           </div>
           <div class="stat-card">
             <div class="stat-card-label">Best Score</div>
@@ -210,11 +225,10 @@
             <div style="text-align:right">Score</div>
           </div>
           {% for s in sessions %}
-          {% set score_class = 'high' if s.score >= 7.5 else ('mid' if s.score >= 5.5 else 'low') %}
+          {% set score_class = 'high' if s.score >= 80 else ('mid' if s.score >= 55 else 'low') %}
           <div class="session-row">
             <div>
-              <div class="session-file">{{ s.filename }}</div>
-              <div class="session-date">{{ s.created_at }}</div>
+              <a href="{{ url_for('view_session', session_id=s.id) }}" class="session-file session-file-link">{{ s.filename }}</a>
             </div>
             <div class="session-player">
               <div class="player-dot"></div>
@@ -223,15 +237,9 @@
                 <div class="player-style-text">{{ s.player_style }}</div>
               </div>
             </div>
-            <div class="session-type">
-              {% if s.filename.lower().endswith(('.mp4','.mov','.avi','.mkv')) %}
-                🎥 Video
-              {% else %}
-                📸 Image
-              {% endif %}
-            </div>
+            <div class="session-type">{{ (s.created_at or '')[:10] }}</div>
             <div class="score-badge {{ score_class }}">
-              {{ s.score }}<span>/10</span>
+              {{ s.score }}<span>/100</span>
             </div>
           </div>
           {% endfor %}
@@ -292,7 +300,7 @@
             titleColor: '#4ADE80',
             bodyColor: '#f0f2f5',
             callbacks: {
-              label: ctx => ` Score: ${ctx.parsed.y} / 10`
+              label: ctx => ` Score: ${ctx.parsed.y} / 100`
             }
           }
         },
@@ -302,7 +310,7 @@
             ticks: { color: '#5a6470', font: { family: 'Barlow', size: 11 } }
           },
           y: {
-            min: 0, max: 10,
+            min: 0, max: 100,
             grid: { color: 'rgba(255,255,255,0.04)' },
             ticks: {
               color: '#5a6470', font: { family: 'Barlow', size: 11 },
