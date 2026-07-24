@@ -32,10 +32,9 @@ import mediapipe as mp
 import numpy as np
 import pandas as pd
 
-# mediapipe_pose/ lives one level up, as a sibling of this webapp/ folder
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 
 from mediapipe_pose.tennis_video_analysis import process_video
 from mediapipe_pose.utils import create_detector
@@ -61,13 +60,13 @@ LANDMARK_NAMES = [
 
 # Where persistent per-upload analysis outputs (angle CSV + optional
 # annotated video) go. Lives inside webapp/, next to this file.
-ANALYSIS_OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "analysis_outputs")
+ANALYSIS_OUTPUT_DIR = os.path.join(BASE_DIR, "analysis_outputs")
 
 # Where reference-format coordinate CSVs from webapp uploads go — inside
 # mediapipe_pose/serve_recs/, alongside your other recorded/processed
 # serves, so they're all browsable in one place instead of split across
 # webapp/analysis_outputs/.
-SERVE_RECS_DIR = os.path.join(PROJECT_ROOT, "mediapipe_pose", "serve_recs")
+SERVE_RECS_DIR = os.path.join(BASE_DIR, "mediapipe_pose", "serve_recs")
 
 
 def video_to_marker_trajectory(video_path, hand: str = 'right', frame_step: int = 1,
