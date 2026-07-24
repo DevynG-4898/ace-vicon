@@ -24,11 +24,8 @@ from typing import Any
 
 import numpy as np
 
-_DTW_DIR = Path(__file__).resolve().parent.parent.parent / "dtw"
-if str(_DTW_DIR) not in sys.path:
-    sys.path.insert(0, str(_DTW_DIR))
 
-from src.load_data import FILENAME_TO_MARKER, load_single_serve  # noqa: E402
+from src.markers.load_data import FILENAME_TO_MARKER, load_single_serve  # noqa: E402
 
 ACE_MARKER_NAMES = (
     "head",
