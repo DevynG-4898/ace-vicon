@@ -287,8 +287,8 @@
   <script>
     const snapshots = {{ grade_results.snapshots | tojson }};
     const weights = {{ SNAPSHOT_WEIGHTS | tojson }};
-    const order = Object.keys(snapshots);
-
+    const order = {{ SNAPSHOT_NAMES | tojson }}.filter(snap => snap in snapshots);  
+    
     function tierClass(score) {
       if (score >= 90) return 'excellent';
       if (score >= 75) return 'good';
