@@ -1,9 +1,17 @@
+import sys
+import os
+
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, _REPO_ROOT)
+sys.path.insert(0, os.path.join(_REPO_ROOT, "formatdata and render"))
+
+from format.pipeline import run_customer_video_vs_reference_csv_pipeline
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file
 from model import compute_similarity_from_csv, compute_similarity_from_video
 from supabase_helper import supabase
-from grading_pipeline import analyze_and_grade_video
 from grade_snapshots import SNAPSHOT_WEIGHTS, SNAPSHOT_NAMES
 from video_pose import video_to_world_landmarks_csv, video_to_reference_format_csv
+from format.pipeline import run_video_coaching_pipeline
 
 # Racket detection uses OpenCV. If OpenCV is missing, it wont crash the whole web app at startup.
 try:
@@ -27,8 +35,11 @@ import matplotlib.pyplot as plt
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key")
 
-app.json.sort_keys = False          # Flask >= 2.3
-
+# Flask sorts JSON keys alphabetically by default, which breaks any ordered
+# dict (like grade_results['snapshots']) sent to the frontend via |tojson.
+# Keep insertion order intact so the phase bars render in serve-timeline
+# order (start_pose -> ... -> finish_pose) instead of alphabetically.
+app.json.sort_keys = False  # Flask >= 2.3
 
 UPLOAD_FOLDER = "uploads"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
@@ -86,7 +97,6 @@ PLAYERS = {
         "avatar": "player4.png",
         "reference_files": [
             os.path.join(BASE_DIR, "reference_players/shelton_formatted.csv"),
-
         ],
         "tips": [
             "Your serve is being compared to Max's recorded Vicon motion data.",
@@ -102,7 +112,7 @@ DEFAULT_PLAYER = "max"
 
 # ── DATABASE / SUPABASE ─────────────────────────────────────
 
-def save_session(user_id, filename, player_key, player_name, player_style, score):
+def save_session(user_id, filename, player_key, player_name, player_style, score, report_data=None):
     """Save one analysis result to the Supabase sessions table."""
     response = (
         supabase.table("sessions")
@@ -114,6 +124,7 @@ def save_session(user_id, filename, player_key, player_name, player_style, score
                 "player_name": player_name,
                 "player_style": player_style,
                 "score": score,
+                "report_data": report_data,
             }
         )
         .execute()
@@ -336,6 +347,49 @@ def myprogress():
     )
 
 
+@app.route("/session/<session_id>")
+def view_session(session_id):
+    if not login_required():
+        return redirect(url_for("login"))
+
+    restore_supabase_session()
+
+    try:
+        response = (
+            supabase.table("sessions")
+            .select("*")
+            .eq("id", session_id)
+            .eq("user_id", session["user_id"])  # ensure users can only view their own sessions
+            .single()
+            .execute()
+        )
+        row = response.data
+    except Exception as e:
+        print(f"VIEW SESSION ERROR: {e}")
+        flash("Could not load that session.")
+        return redirect(url_for("myprogress"))
+
+    if not row:
+        flash("Session not found.")
+        return redirect(url_for("myprogress"))
+
+    report = row.get("report_data") or {}
+    player = {"name": row.get("player_name"), "style": row.get("player_style"), "tips": []}
+
+    return render_template(
+        "result.html",
+        user=session["user"],
+        filename=row.get("filename"),
+        player=player,
+        score=row.get("score"),
+        plot_path=report.get("plot_path"),
+        grade_results=report.get("grade_results"),
+        coaching_report=report.get("coaching_report"),
+        SNAPSHOT_WEIGHTS=SNAPSHOT_WEIGHTS,
+        SNAPSHOT_NAMES=SNAPSHOT_NAMES,
+    )
+
+
 # ── MAIN ANALYSIS ─────────────────────────────────────────
 
 @app.route("/upload", methods=["POST"])
@@ -369,7 +423,7 @@ def upload():
     # ── RACKET RELEVANCE CHECK (video uploads only) ─────────
     # CSV files have no visual content, so this only applies to videos.
     # Rejects the upload before it ever reaches the expensive
-    # MediaPipe pose-extraction step.
+    # pose-extraction step.
     if ext in VIDEO_EXTENSIONS:
         passed, details = detect_racket(save_path)
         if not passed:
@@ -379,15 +433,18 @@ def upload():
             return redirect(url_for("analyse", player=player_key))
 
     # ── SCORING ───────────────────────────────────────────────
-    # Video uploads go through the full snapshot-based grading pipeline:
-    # raw MediaPipe landmarks -> format_data_mediapipe -> find_snapshots
-    # -> grade_snapshots, compared against the standing reference serve
-    # (see grading_pipeline.build_reference_serve() / REFERENCE_FORMATTED_CSV).
+    # Video uploads go through the full pipeline:
+    # video -> pose estimation -> ACE markers -> formatted CSV -> snapshots
+    # -> grade_snapshots.grade_serve() -> ScoringReport -> ScoringReportReader
+    # -> CoachingEngine -> CoachingReport (human-language feedback).
+    # See format/pipeline.py: run_video_coaching_pipeline() re-uses
+    # grade_snapshots.grade_serve() internally, so snapshot_grade below has
+    # the exact same shape the phase-bar chart in result.html already expects.
     #
     # CSV uploads still go through the older angle/DTW similarity path for
-    # now -- they'd need their own run through format_data.py (the raw,
-    # unmarked-Vicon-track version) + find_snapshots.py before they could
-    # use grade_snapshots.py the same way a video does. Left as a follow-up.
+    # now -- they'd need their own run through format/data + snapshot
+    # extraction before they could use the same coaching pipeline a video
+    # does. Left as a follow-up; no coaching_report is generated for CSVs.
     try:
         if ext in CSV_EXTENSIONS:
             score, avg_z, ref_mean, user_traj = compute_similarity_from_csv(
@@ -396,8 +453,13 @@ def upload():
             score = round(score, 1)
             plot_path = create_plot(user_traj, ref_mean)
             grade_results = None
+            coaching_report = None
         else:
-            grade_results = analyze_and_grade_video(save_path, reference_csv_path=player["reference_files"][0])
+            pipeline_result = run_customer_video_vs_reference_csv_pipeline(
+                save_path, player["reference_files"][0]
+            )
+            grade_results = pipeline_result.snapshot_grade
+            coaching_report = pipeline_result.coaching_report
             score = grade_results["overall_score"]
             plot_path = None
 
@@ -417,6 +479,11 @@ def upload():
             player_name=player["name"],
             player_style=player["style"],
             score=score,
+            report_data={
+                "grade_results": grade_results,
+                "coaching_report": coaching_report.to_dict() if coaching_report else None,
+                "plot_path": plot_path,
+            },
         )
     except Exception as e:
         print(f"SAVE SESSION ERROR: {e}")
@@ -430,9 +497,9 @@ def upload():
         score=score,
         plot_path=plot_path,
         grade_results=grade_results,
+        coaching_report=coaching_report,
         SNAPSHOT_WEIGHTS=SNAPSHOT_WEIGHTS,
         SNAPSHOT_NAMES=SNAPSHOT_NAMES,
-
     )
 
 

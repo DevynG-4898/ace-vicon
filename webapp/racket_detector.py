@@ -22,7 +22,7 @@ def _get_model():
     return _model
 
 
-def detect_racket(video_path, sample_every_n_frames=1, min_hits=2, conf_threshold=0.35):
+def detect_racket(video_path, sample_every_n_frames=1, min_hits=1, conf_threshold=0.2):
     """
     Samples frames from the video and checks for a tennis racket.
 

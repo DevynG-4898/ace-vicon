@@ -187,6 +187,32 @@
     .tips-list p { font-size: 0.9rem; color: var(--text); padding: 0.35rem 0; }
     .tips-list p::before { content: "• "; color: var(--green); }
     .explain-text { color: var(--muted); font-size: 0.85rem; line-height: 1.65; }
+
+    /* ── COACHING REPORT ── */
+    .reco-block {
+      border-left: 3px solid var(--border);
+      padding: 0.9rem 1rem;
+      margin-bottom: 1rem;
+      background: var(--surface-2);
+      border-radius: 0 8px 8px 0;
+    }
+    .reco-block.priority-high { border-left-color: var(--red); }
+    .reco-block.priority-medium { border-left-color: var(--amber); }
+    .reco-block.priority-low { border-left-color: var(--green); }
+
+    .reco-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem; }
+    .reco-label { font-family: 'Anton', sans-serif; font-size: 0.75rem; letter-spacing: 1px; color: var(--muted); }
+    .reco-priority { font-size: 0.7rem; font-weight: 600; color: var(--text); background: rgba(255,255,255,0.06); padding: 0.15rem 0.6rem; border-radius: 10px; }
+    .reco-feature { font-size: 1rem; font-weight: 600; color: #fff; margin-bottom: 0.3rem; }
+    .reco-correction { font-size: 0.88rem; color: var(--text); margin-bottom: 0.6rem; }
+    .reco-sublist { margin-top: 0.5rem; }
+    .reco-subhead { font-size: 0.72rem; letter-spacing: 0.5px; color: var(--muted); text-transform: uppercase; margin-bottom: 0.25rem; }
+    .reco-item { font-size: 0.82rem; color: rgba(240,242,245,0.75); padding: 0.12rem 0; line-height: 1.5; }
+    .reco-strengths { margin-top: 0.5rem; }
+    .reco-warnings { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border); }
+    .reco-warning-item { font-size: 0.8rem; color: var(--amber); padding: 0.15rem 0; }
+    .tips-list-item { font-size: 0.85rem; color: var(--text); padding: 0.2rem 0; }
+    .tips-list-item::before { content: "✓ "; color: var(--green); }
   </style>
 </head>
 <body>
@@ -237,32 +263,90 @@
     </div>
     {% endif %}
 
-    <!-- GRAPH -->
+    {% if coaching_report %}
+    <!-- COACHING REPORT (human-language feedback) -->
     <div class="card">
-      <h3>Serve Comparison</h3>
-      {% if plot_path %}
-      <img src="{{ url_for('static', filename=plot_path) }}" alt="Serve comparison plot">
-      <p style="color: var(--muted); font-size: 0.85rem; margin-top: 0.6rem;">
-        Your serve (blue) vs reference model (Max)
-      </p>
-      {% else %}
-      <p style="color: var(--muted); font-size: 0.85rem;">
-        Plot visualization coming soon.
-      </p>
-      {% endif %}
-    </div>
+      <h3>Coaching Report</h3>
 
-    <!-- TIPS -->
-    {% if player.tips %}
-    <div class="card">
-      <h3>Areas to Improve</h3>
-      <div class="tips-list">
-        {% for tip in player.tips %}
-        <p>{{ tip }}</p>
+      {% if coaching_report.primary_recommendation %}
+      {% set rec = coaching_report.primary_recommendation %}
+      <div class="reco-block priority-{{ rec.priority|lower }}">
+        <div class="reco-header">
+          <span class="reco-label">Primary Focus</span>
+          <span class="reco-priority">{{ rec.priority }}</span>
+        </div>
+        <p class="reco-feature">{{ rec.feature }}</p>
+        <p class="reco-correction">{{ rec.correction }}</p>
+
+        {% if rec.coach_quotes %}
+        <div class="reco-sublist">
+          <p class="reco-subhead">Coach Quotes</p>
+          {% for q in rec.coach_quotes %}
+          <p class="reco-item">“{{ q }}”</p>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if rec.practice_drills %}
+        <div class="reco-sublist">
+          <p class="reco-subhead">Practice Drills</p>
+          {% for d in rec.practice_drills %}
+          <p class="reco-item">{{ d }}</p>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      {% for rec in coaching_report.secondary_recommendations %}
+      <div class="reco-block priority-{{ rec.priority|lower }}">
+        <div class="reco-header">
+          <span class="reco-label">Secondary Focus</span>
+          <span class="reco-priority">{{ rec.priority }}</span>
+        </div>
+        <p class="reco-feature">{{ rec.feature }}</p>
+        <p class="reco-correction">{{ rec.correction }}</p>
+
+        {% if rec.coach_quotes %}
+        <div class="reco-sublist">
+          <p class="reco-subhead">Coach Quotes</p>
+          {% for q in rec.coach_quotes %}
+          <p class="reco-item">“{{ q }}”</p>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if rec.practice_drills %}
+        <div class="reco-sublist">
+          <p class="reco-subhead">Practice Drills</p>
+          {% for d in rec.practice_drills %}
+          <p class="reco-item">{{ d }}</p>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+
+      {% if coaching_report.strengths %}
+      <div class="reco-strengths">
+        <p class="reco-subhead">Strengths</p>
+        {% for s in coaching_report.strengths %}
+        <p class="tips-list-item">{{ s }}</p>
         {% endfor %}
       </div>
+      {% endif %}
+
+      {% if coaching_report.warnings %}
+      <div class="reco-warnings">
+        <p class="reco-subhead">Notes</p>
+        {% for w in coaching_report.warnings %}
+        <p class="reco-warning-item">⚠ {{ w }}</p>
+        {% endfor %}
+      </div>
+      {% endif %}
     </div>
     {% endif %}
+
 
     <!-- MODEL EXPLANATION -->
     <div class="card">
@@ -287,8 +371,8 @@
   <script>
     const snapshots = {{ grade_results.snapshots | tojson }};
     const weights = {{ SNAPSHOT_WEIGHTS | tojson }};
-    const order = {{ SNAPSHOT_NAMES | tojson }}.filter(snap => snap in snapshots);  
-    
+    const order = {{ SNAPSHOT_NAMES | tojson }}.filter(snap => snap in snapshots);
+
     function tierClass(score) {
       if (score >= 90) return 'excellent';
       if (score >= 75) return 'good';
