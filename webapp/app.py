@@ -12,6 +12,7 @@ from supabase_helper import supabase
 from grade_snapshots import SNAPSHOT_WEIGHTS, SNAPSHOT_NAMES
 from video_pose import video_to_world_landmarks_csv, video_to_reference_format_csv
 from format.pipeline import run_video_coaching_pipeline
+from werkzeug.utils import secure_filename
 
 # Racket detection uses OpenCV. If OpenCV is missing, it wont crash the whole web app at startup.
 try:
@@ -41,11 +42,11 @@ app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key")
 # order (start_pose -> ... -> finish_pose) instead of alphabetically.
 app.json.sort_keys = False  # Flask >= 2.3
 
-UPLOAD_FOLDER = "uploads"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 CSV_EXTENSIONS = {".csv"}
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
@@ -388,7 +389,27 @@ def view_session(session_id):
         SNAPSHOT_WEIGHTS=SNAPSHOT_WEIGHTS,
         SNAPSHOT_NAMES=SNAPSHOT_NAMES,
     )
+# processing helper
+def make_json_safe(value):
+    if isinstance(value, dict):
+        return {
+            key: make_json_safe(item)
+            for key, item in value.items()
+        }
 
+    if isinstance(value, list):
+        return [make_json_safe(item) for item in value]
+
+    if isinstance(value, tuple):
+        return [make_json_safe(item) for item in value]
+
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+
+    if isinstance(value, np.generic):
+        return value.item()
+
+    return value
 
 # ── MAIN ANALYSIS ─────────────────────────────────────────
 
@@ -401,36 +422,168 @@ def upload():
 
     file = request.files.get("media")
 
-    if not file or file.filename == "":
+    if not file or not file.filename:
         flash("No file uploaded.")
         return redirect(url_for("analyse"))
 
-    filename = file.filename
+    filename = secure_filename(file.filename)
+
+    if not filename:
+        flash("Invalid filename.")
+        return redirect(url_for("analyse"))
+
     ext = os.path.splitext(filename)[1].lower()
 
     if ext not in CSV_EXTENSIONS and ext not in VIDEO_EXTENSIONS:
-        flash("Please upload a CSV or video file (.csv, .mp4, .mov, .avi, .mkv, .webm).")
+        flash(
+            "Please upload a CSV or video file "
+            "(.csv, .mp4, .mov, .avi, .mkv, .webm)."
+        )
         return redirect(url_for("analyse"))
 
     player_key = request.form.get("player_key", DEFAULT_PLAYER)
+
     if player_key not in PLAYERS:
         player_key = DEFAULT_PLAYER
+
     player = PLAYERS[player_key]
 
     save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-    file.save(save_path)
+
+    try:
+        file.save(save_path)
+        print(f"UPLOAD SAVED: {save_path}")
+        print(f"UPLOAD SIZE: {os.path.getsize(save_path)} bytes")
+
+    except Exception as e:
+        print(f"FILE SAVE ERROR: {e}")
+
+        import traceback
+        traceback.print_exc()
+
+        flash("The uploaded file could not be saved.")
+        return redirect(url_for("analyse", player=player_key))
+
+    try:
+        if ext in VIDEO_EXTENSIONS:
+            # Temporarily skip racket detection while diagnosing memory use.
+            # Re-enable later after the main pipeline works reliably.
+            print("STARTING VIDEO PIPELINE")
+
+            reference_path = player["reference_files"][0]
+
+            if not os.path.exists(reference_path):
+                raise FileNotFoundError(
+                    f"Reference CSV was not found: {reference_path}"
+                )
+
+            pipeline_result = run_customer_video_vs_reference_csv_pipeline(
+                save_path,
+                reference_path,
+            )
+
+            print("VIDEO PIPELINE COMPLETE")
+
+            grade_results = pipeline_result.snapshot_grade
+            coaching_report = pipeline_result.coaching_report
+            score = float(grade_results["overall_score"])
+            plot_path = None
+
+        else:
+            score, avg_z, ref_mean, user_traj = compute_similarity_from_csv(
+                save_path,
+                player["reference_files"],
+            )
+
+            score = round(float(score), 1)
+            plot_path = create_plot(user_traj, ref_mean)
+            grade_results = None
+            coaching_report = None
+
+    except Exception as e:
+        print(f"UPLOAD PROCESSING ERROR: {e}")
+
+        import traceback
+        traceback.print_exc()
+
+        flash(f"Error processing file: {e}")
+        return redirect(url_for("analyse", player=player_key))
+
+    try:
+        coaching_report_data = (
+            coaching_report.to_dict()
+            if coaching_report and hasattr(coaching_report, "to_dict")
+            else coaching_report
+        )
+
+        save_session(
+            user_id=session["user_id"],
+            filename=filename,
+            player_key=player_key,
+            player_name=player["name"],
+            player_style=player["style"],
+            score=score,
+            report_data={
+                "grade_results": make_json_safe(grade_results),
+                "coaching_report": make_json_safe(coaching_report_data),
+                "plot_path": plot_path,
+            },
+        )
+
+    except Exception as e:
+        print(f"SAVE SESSION ERROR: {e}")
+
+        import traceback
+        traceback.print_exc()
+
+        flash("Analysis completed, but progress history could not be saved.")
+
+    finally:
+        # Remove the original upload after processing to reduce disk usage.
+        try:
+            if os.path.exists(save_path):
+                os.remove(save_path)
+        except Exception as cleanup_error:
+            print(f"UPLOAD CLEANUP ERROR: {cleanup_error}")
+
+    return render_template(
+        "result.html",
+        user=session["user"],
+        filename=filename,
+        player=player,
+        score=score,
+        plot_path=plot_path,
+        grade_results=grade_results,
+        coaching_report=coaching_report_data,
+        SNAPSHOT_WEIGHTS=SNAPSHOT_WEIGHTS,
+        SNAPSHOT_NAMES=SNAPSHOT_NAMES,
+    )
 
     # ── RACKET RELEVANCE CHECK (video uploads only) ─────────
     # CSV files have no visual content, so this only applies to videos.
     # Rejects the upload before it ever reaches the expensive
     # pose-extraction step.
     if ext in VIDEO_EXTENSIONS:
+    try:
         passed, details = detect_racket(save_path)
-        if not passed:
+    except Exception as e:
+        print(f"RACKET DETECTOR ERROR: {e}")
+        import traceback
+        traceback.print_exc()
+
+        flash("The video could not be checked for a tennis racket.")
+        return redirect(url_for("analyse", player=player_key))
+
+    if not passed:
+        if os.path.exists(save_path):
             os.remove(save_path)
-            print(f"RACKET CHECK FAILED for {filename}: {details}")
-            flash("We couldn't detect a tennis racket in your video. Please upload a video of your serve.")
-            return redirect(url_for("analyse", player=player_key))
+
+        print(f"RACKET CHECK FAILED for {filename}: {details}")
+        flash(
+            "We couldn't detect a tennis racket in your video. "
+            "Please upload a video of your serve."
+        )
+        return redirect(url_for("analyse", player=player_key))
 
     # ── SCORING ───────────────────────────────────────────────
     # Video uploads go through the full pipeline:
