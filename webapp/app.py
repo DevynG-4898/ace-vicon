@@ -14,6 +14,12 @@ from video_pose import video_to_world_landmarks_csv, video_to_reference_format_c
 from format.pipeline import run_video_coaching_pipeline
 from werkzeug.utils import secure_filename
 
+from supabase import create_client
+from supabase.client import ClientOptions
+
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_ANON_KEY")
+
 # Racket detection uses OpenCV. If OpenCV is missing, it wont crash the whole web app at startup.
 try:
     from racket_detector import detect_racket
@@ -113,10 +119,18 @@ DEFAULT_PLAYER = "max"
 
 # ── DATABASE / SUPABASE ─────────────────────────────────────
 
-def save_session(user_id, filename, player_key, player_name, player_style, score, report_data=None):
-    """Save one analysis result to the Supabase sessions table."""
+def save_session(
+    db,
+    user_id,
+    filename,
+    player_key,
+    player_name,
+    player_style,
+    score,
+    report_data=None,
+):
     response = (
-        supabase.table("sessions")
+        db.table("sessions")
         .insert(
             {
                 "user_id": user_id,
@@ -130,18 +144,19 @@ def save_session(user_id, filename, player_key, player_name, player_style, score
         )
         .execute()
     )
+
     return response.data
 
 
-def get_user_sessions(user_id):
-    """Load the current user's analysis history from Supabase."""
+def get_user_sessions(db, user_id):
     response = (
-        supabase.table("sessions")
+        db.table("sessions")
         .select("*")
         .eq("user_id", user_id)
         .order("created_at", desc=True)
         .execute()
     )
+
     return response.data or []
 
 
@@ -164,18 +179,27 @@ def login_required():
     return "user" in session and "user_id" in session
 
 
-def restore_supabase_session():
-    """Attach the current Flask user's Supabase token before RLS-protected queries."""
+def get_user_supabase():
+    """
+    Create a request-specific Supabase client using the current user's
+    access token without consuming or rotating the refresh token.
+    """
     access_token = session.get("access_token")
-    refresh_token = session.get("refresh_token")
 
-    if not access_token or not refresh_token:
-        return
+    if not access_token:
+        raise RuntimeError("No Supabase access token is available.")
 
-    try:
-        supabase.auth.set_session(access_token, refresh_token)
-    except Exception as e:
-        print(f"SUPABASE SESSION RESTORE ERROR: {e}")
+    client = create_client(
+        SUPABASE_URL,
+        SUPABASE_KEY,
+        options=ClientOptions(
+            auto_refresh_token=False,
+            persist_session=False,
+        ),
+    )
+
+    client.postgrest.auth(access_token)
+    return client
 
 
 # ── GRAPH FUNCTION ─────────────────────────────────────────
