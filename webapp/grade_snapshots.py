@@ -92,6 +92,113 @@ FEEDBACK_TEMPLATES = {
 }
 
 # ─────────────────────────────────────────────
+# 2b. MISSING-SNAPSHOT WARNING TIERS
+#    A missing snapshot silently drops out of the weighted average. How
+#    much that matters depends entirely on its weight: missing contact
+#    (30%) or peak_racket_arm (20%) can meaningfully skew the score,
+#    while missing hand_cross (5%) barely moves it. Three tiers, rather
+#    than one binary flag, let the message match the actual stakes.
+# ─────────────────────────────────────────────
+
+# weight >= this  -> "high" tier: score likely skewed, recommend re-upload
+HIGH_WEIGHT = 0.20
+# weight >= this (and < HIGH_WEIGHT) -> "medium" tier: some impact, re-upload optional
+MEDIUM_WEIGHT = 0.10
+# below MEDIUM_WEIGHT -> "low" tier: negligible impact, informational only
+
+_TIER_ORDER = {"high": 3, "medium": 2, "low": 1}
+
+
+def _weight_tier(weight: float) -> str:
+    if weight >= HIGH_WEIGHT:
+        return "high"
+    if weight >= MEDIUM_WEIGHT:
+        return "medium"
+    return "low"
+
+
+def _join_and(labels: list[str]) -> str:
+    """'A' / 'A and B' / 'A, B and C' -- oxford-comma-free, matches casual copy tone."""
+    if len(labels) == 1:
+        return labels[0]
+    if len(labels) == 2:
+        return f"{labels[0]} and {labels[1]}"
+    return f"{', '.join(labels[:-1])} and {labels[-1]}"
+
+
+def _missing_snapshot_warnings(missing: list[tuple[str, float]]) -> dict:
+    """
+    Build a structured warning payload from the snapshots that were
+    dropped out of the weighted average, grouped by how much their
+    weight means the score is affected.
+
+    missing: list of (snapshot_name, weight) tuples for snapshots not
+    found in the customer file, reference file, or both.
+    """
+    if not missing:
+        return {
+            "has_warning": False,
+            "severity": None,
+            "suggest_reupload": False,
+            "total_missing_weight_pct": 0,
+            "missing_snapshots": [],
+            "summary": "",
+        }
+
+    total_missing_weight = sum(w for _, w in missing)
+
+    entries = []
+    for name, w in sorted(missing, key=lambda x: -x[1]):
+        tier = _weight_tier(w)
+        label = name.replace("_", " ").title()
+        pct = int(round(w * 100))
+        entries.append({"name": name, "label": label, "weight_pct": pct, "tier": tier})
+
+    # Overall severity = the worst tier present among the missing snapshots.
+    severity = max((e["tier"] for e in entries), key=lambda t: _TIER_ORDER[t])
+
+    # Always name every missing phase, not just the ones driving severity --
+    # a "high" verdict shouldn't make a co-missing low-weight phase invisible.
+    all_labels = [e["label"] for e in entries]
+    names_str = _join_and(all_labels)
+    were_was = "wasn't detected" if len(entries) == 1 else "weren't detected"
+
+    if severity == "high":
+        driver_labels = [e["label"] for e in entries if e["tier"] == "high"]
+        carry = "carries" if len(driver_labels) == 1 else "carry"
+        summary = (
+            f"{names_str} {were_was} in this clip. {_join_and(driver_labels)} "
+            f"{carry} significant weight, so the score above likely doesn't "
+            f"reflect your full serve."
+        )
+    elif severity == "medium":
+        driver_labels = [e["label"] for e in entries if e["tier"] == "medium"]
+        carry = "carries" if len(driver_labels) == 1 else "carry"
+        summary = (
+            f"{names_str} {were_was} in this clip. {_join_and(driver_labels)} "
+            f"{carry} moderate weight, so the score above may be a little off."
+        )
+    else:
+        summary = (
+            f"{names_str} {were_was}, but {'this is' if len(entries) == 1 else 'these are'} "
+            f"low-weight, so it shouldn't meaningfully affect your analysis."
+        )
+
+    # Only nudge toward a re-upload when at least one missing snapshot
+    # actually carries enough weight (medium or high) to be worth it.
+    suggest_reupload = severity in ("high", "medium")
+
+    return {
+        "has_warning": True,
+        "severity": severity,
+        "suggest_reupload": suggest_reupload,
+        "total_missing_weight_pct": int(round(total_missing_weight * 100)),
+        "missing_snapshots": [e["name"] for e in entries],
+        "summary": summary,
+    }
+
+
+# ─────────────────────────────────────────────
 # 3. FILE PARSING
 #    Mirrors find_snapshots.py's reader so both scripts stay in sync on
 #    what the _formatted.csv structure looks like.
@@ -245,27 +352,30 @@ def grade_serve(customer_path: str, reference_path: str) -> dict:
     results = {"snapshots": {}, "customer_racket_side": cust_racket, "reference_racket_side": ref_racket}
     weighted_total = 0.0
     weight_used = 0.0
+    missing: list[tuple[str, float]] = []
 
     for snap in SNAPSHOT_NAMES:
         cust_frame = cust_snaps.get(snap, 0)
         ref_frame  = ref_snaps.get(snap, 0)
 
         if not cust_frame or not ref_frame:
-            missing = []
+            missing_from = []
             if not cust_frame:
-                missing.append("customer")
+                missing_from.append("customer")
             if not ref_frame:
-                missing.append("reference")
+                missing_from.append("reference")
             results["snapshots"][snap] = {
                 "snapshot_score": None,
-                "summary": f"not found in {' and '.join(missing)}",
+                "summary": f"not found in {' and '.join(missing_from)}",
             }
+            missing.append((snap, SNAPSHOT_WEIGHTS.get(snap, 0)))
             continue
 
         cust_idx = frame_to_idx(cust_df, cust_frame)
         ref_idx  = frame_to_idx(ref_df, ref_frame)
         if cust_idx is None or ref_idx is None:
             results["snapshots"][snap] = {"snapshot_score": None, "summary": "frame not found in data"}
+            missing.append((snap, SNAPSHOT_WEIGHTS.get(snap, 0)))
             continue
 
         joint_results = {}
@@ -297,6 +407,7 @@ def grade_serve(customer_path: str, reference_path: str) -> dict:
 
         if not joint_scores:
             results["snapshots"][snap] = {"snapshot_score": None, "summary": "no joints computable"}
+            missing.append((snap, SNAPSHOT_WEIGHTS.get(snap, 0)))
             continue
 
         snapshot_score = round(sum(joint_scores) / len(joint_scores), 1)
@@ -310,6 +421,11 @@ def grade_serve(customer_path: str, reference_path: str) -> dict:
         w = SNAPSHOT_WEIGHTS.get(snap, 0)
         weighted_total += snapshot_score * w
         weight_used += w
+
+    # Surface which snapshots dropped out of the weighted average, and
+    # whether any of them carried enough weight to make the score
+    # unreliable on its own (see SIGNIFICANT_WEIGHT / REUPLOAD_WEIGHT_THRESHOLD).
+    results["warnings"] = _missing_snapshot_warnings(missing)
 
     if weight_used == 0:
         results["overall_score"] = None
@@ -369,6 +485,13 @@ def print_report(results: dict) -> None:
                     joint=jlabel, snapshot_label=label, context=SNAPSHOT_CONTEXT[snap]
                 )
                 print(f"        \u2192 {feedback}")
+
+    if results.get("warnings", {}).get("has_warning"):
+        w = results["warnings"]
+        print(f"\n{sep}")
+        tag = {"high": "RE-UPLOAD RECOMMENDED", "medium": "RE-UPLOAD OPTIONAL", "low": "MINOR GAPS"}[w["severity"]]
+        print(f"  DATA WARNING ({tag}) -- {w['total_missing_weight_pct']}% of grade weight missing")
+        print(f"    {w['summary']}")
 
     print(f"\n{sep}")
     print(f"  OVERALL SCORE : {results['overall_score']}/100")

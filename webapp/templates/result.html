@@ -97,6 +97,24 @@
 
     img { width: 100%; max-width: 600px; border-radius: 10px; display: block; }
 
+    /* ── MISSING-PHASE NOTE ── */
+    .phase-note {
+      display: flex; align-items: flex-start; gap: 0.65rem;
+      margin-top: 1.25rem; padding-top: 1.1rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.8rem; color: var(--text); line-height: 1.55;
+    }
+    .phase-note-icon { flex-shrink: 0; margin-top: 0.05rem; color: var(--muted); opacity: 0.85; }
+    .phase-note.severity-medium .phase-note-icon,
+    .phase-note.severity-high .phase-note-icon { color: var(--amber); }
+    .phase-note-body { flex: 1; min-width: 0; color: var(--text); }
+    .phase-note-body b { color: #fff; font-weight: 700; }
+    .phase-note-link {
+      color: var(--green); text-decoration: none; font-weight: 600;
+      white-space: nowrap;
+    }
+    .phase-note-link:hover { text-decoration: underline; }
+
     /* ── BAR CHART ── */
     .chart-row {
       display: flex; align-items: flex-end; gap: 0.6rem;
@@ -222,7 +240,7 @@
     <a href="{{ url_for('home') }}" class="nav-logo"><span class="t">ACE</span></a>
     <div class="nav-links">
       <a href="{{ url_for('home') }}">Home</a>
-      <a href="{{ url_for('analyse') }}">Analyse</a>
+      <a href="{{ url_for('analyse') }}">Analyze</a>
       <a href="{{ url_for('myprogress') }}">My Progress</a>
       <a href="{{ url_for('logout') }}" class="logout">Logout</a>
     </div>
@@ -260,6 +278,19 @@
       <div class="detail-panel" id="detailPanel">
         <p class="detail-empty">Select a phase above to see its breakdown.</p>
       </div>
+
+      {% if grade_results.warnings and grade_results.warnings.has_warning %}
+      {% set w = grade_results.warnings %}
+      <div class="phase-note severity-{{ w.severity }}">
+        <span class="phase-note-icon">ⓘ</span>
+        <div class="phase-note-body">
+          <span>{{ w.summary }}</span>
+          {% if w.suggest_reupload %}
+          <a href="{{ url_for('analyse') }}" class="phase-note-link">Upload another clip →</a>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
     </div>
     {% endif %}
 
@@ -336,14 +367,6 @@
       </div>
       {% endif %}
 
-      {% if coaching_report.warnings %}
-      <div class="reco-warnings">
-        <p class="reco-subhead">Notes</p>
-        {% for w in coaching_report.warnings %}
-        <p class="reco-warning-item">⚠ {{ w }}</p>
-        {% endfor %}
-      </div>
-      {% endif %}
     </div>
     {% endif %}
 
@@ -363,7 +386,7 @@
 
   <!-- PINNED ACTIONS -->
   <div class="action-bar">
-    <a href="{{ url_for('analyse') }}" class="primary">ANALYSE ANOTHER</a>
+    <a href="{{ url_for('analyse') }}" class="primary">ANALYZE ANOTHER</a>
     <a href="{{ url_for('myprogress') }}" class="secondary">MY PROGRESS</a>
   </div>
 

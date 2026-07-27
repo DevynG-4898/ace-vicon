@@ -325,6 +325,14 @@ def myprogress():
         flash("Could not load progress history.")
         sessions = []
 
+    # Session numbers count up from the user's first-ever upload (oldest = 1),
+    # so the number reflects their actual timeline regardless of how the
+    # table itself is sorted (newest-first, below).
+    sessions_by_age = sorted(sessions, key=lambda s: s.get("created_at") or "")
+    session_numbers = {s.get("id"): i + 1 for i, s in enumerate(sessions_by_age)}
+    for s in sessions:
+        s["session_number"] = session_numbers.get(s.get("id"))
+
     chart_sessions = list(reversed(sessions[:10]))
     chart_labels = [(s.get("created_at") or "")[5:10] for s in chart_sessions]
     chart_scores = [s.get("score", 0) for s in chart_sessions]
@@ -463,6 +471,18 @@ def upload():
 
         flash("The uploaded file could not be saved.")
         return redirect(url_for("analyse", player=player_key))
+
+    # ── RACKET RELEVANCE CHECK (video uploads only) ─────────
+    # CSV files have no visual content, so this only applies to videos.
+    # Rejects the upload before it ever reaches the expensive
+    # MediaPipe pose-extraction step.
+    if ext in VIDEO_EXTENSIONS:
+        passed, details = detect_racket(save_path)
+        if not passed:
+            os.remove(save_path)
+            print(f"RACKET CHECK FAILED for {filename}: {details}")
+            flash("We couldn't detect a tennis racket in your video. Please upload a video of your serve.")
+            return redirect(url_for("analyse", player=player_key))
 
     try:
         if ext in VIDEO_EXTENSIONS:

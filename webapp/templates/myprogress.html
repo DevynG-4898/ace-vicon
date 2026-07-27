@@ -165,7 +165,7 @@
     <a href="{{ url_for('home') }}" class="nav-logo"><span class="t">ACE</span></a>
     <div class="nav-links">
       <a href="{{ url_for('home') }}">Home</a>
-      <a href="{{ url_for('analyse') }}">Analyse</a>
+      <a href="{{ url_for('analyse') }}">Analyze</a>
       <a href="{{ url_for('myprogress') }}" class="active">My Progress</a>
       <span class="nav-user">{{ user }}</span>
       <a href="{{ url_for('logout') }}" class="logout">Logout</a>
@@ -188,7 +188,7 @@
           <div class="stat-card">
             <div class="stat-card-label">Total Sessions</div>
             <div class="stat-card-val">{{ total_sessions }}</div>
-            <div class="stat-card-sub">serves analysed</div>
+            <div class="stat-card-sub">serves analyzed</div>
           </div>
           <div class="stat-card">
             <div class="stat-card-label">Average Score</div>
@@ -219,7 +219,7 @@
             <div class="sessions-count">{{ total_sessions }} session{{ 's' if total_sessions != 1 }}</div>
           </div>
           <div class="session-row header">
-            <div>File</div>
+            <div>Session</div>
             <div>Reference Player</div>
             <div>Date</div>
             <div style="text-align:right">Score</div>
@@ -228,7 +228,8 @@
           {% set score_class = 'high' if s.score >= 80 else ('mid' if s.score >= 55 else 'low') %}
           <div class="session-row">
             <div>
-              <a href="{{ url_for('view_session', session_id=s.id) }}" class="session-file session-file-link">{{ s.filename }}</a>
+              <a href="{{ url_for('view_session', session_id=s.id) }}" class="session-file session-file-link">Session {{ s.session_number }}</a>
+              <div class="session-date">{{ s.filename }}</div>
             </div>
             <div class="session-player">
               <div class="player-dot"></div>
@@ -250,8 +251,8 @@
         <div class="empty">
           <div class="empty-icon">🎾</div>
           <h3>NO SESSIONS YET</h3>
-          <p>You haven't analysed any serves yet. Upload your first video or image to start tracking your progress.</p>
-          <a href="{{ url_for('analyse') }}" class="btn-go">ANALYSE YOUR FIRST SERVE →</a>
+          <p>You haven't analyzed any serves yet. Upload your first video or image to start tracking your progress.</p>
+          <a href="{{ url_for('analyse') }}" class="btn-go">ANALYZE YOUR FIRST SERVE →</a>
         </div>
       {% endif %}
 
