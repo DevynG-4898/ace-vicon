@@ -3,22 +3,16 @@ import os
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _REPO_ROOT)
-sys.path.insert(0, os.path.join(_REPO_ROOT, "formatdata and render"))
 
 from format.pipeline import run_customer_video_vs_reference_csv_pipeline
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file
 from model import compute_similarity_from_csv, compute_similarity_from_video
 from supabase_helper import supabase
+from supabase import create_client, ClientOptions
 from grade_snapshots import SNAPSHOT_WEIGHTS, SNAPSHOT_NAMES
 from video_pose import video_to_world_landmarks_csv, video_to_reference_format_csv
 from format.pipeline import run_video_coaching_pipeline
 from werkzeug.utils import secure_filename
-
-from supabase import create_client
-from supabase.client import ClientOptions
-
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_ANON_KEY")
 
 # Racket detection uses OpenCV. If OpenCV is missing, it wont crash the whole web app at startup.
 try:
@@ -29,7 +23,6 @@ except Exception as import_error:
     def detect_racket(_file_path):
         return True, "Racket detector unavailable; skipped check."
 
-import os
 import json
 import re
 import numpy as np
@@ -49,6 +42,12 @@ app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key")
 app.json.sort_keys = False  # Flask >= 2.3
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY")
+
+if not SUPABASE_URL or not SUPABASE_ANON_KEY:
+    raise RuntimeError("SUPABASE_URL and SUPABASE_ANON_KEY must be configured.")
 
 UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
@@ -119,6 +118,25 @@ DEFAULT_PLAYER = "max"
 
 # ── DATABASE / SUPABASE ─────────────────────────────────────
 
+def get_user_supabase():
+    """Create a request-specific Supabase client for RLS-protected queries."""
+    access_token = session.get("access_token")
+
+    if not access_token:
+        raise RuntimeError("No Supabase access token is available.")
+
+    client = create_client(
+        SUPABASE_URL,
+        SUPABASE_ANON_KEY,
+        options=ClientOptions(
+            auto_refresh_token=False,
+            persist_session=False,
+        ),
+    )
+    client.postgrest.auth(access_token)
+    return client
+
+
 def save_session(
     db,
     user_id,
@@ -129,6 +147,7 @@ def save_session(
     score,
     report_data=None,
 ):
+    """Save one analysis result using the current user's RLS token."""
     response = (
         db.table("sessions")
         .insert(
@@ -144,11 +163,11 @@ def save_session(
         )
         .execute()
     )
-
     return response.data
 
 
 def get_user_sessions(db, user_id):
+    """Load the current user's analysis history using an RLS-aware client."""
     response = (
         db.table("sessions")
         .select("*")
@@ -156,7 +175,6 @@ def get_user_sessions(db, user_id):
         .order("created_at", desc=True)
         .execute()
     )
-
     return response.data or []
 
 
@@ -177,29 +195,6 @@ def validate_password(password):
 
 def login_required():
     return "user" in session and "user_id" in session
-
-
-def get_user_supabase():
-    """
-    Create a request-specific Supabase client using the current user's
-    access token without consuming or rotating the refresh token.
-    """
-    access_token = session.get("access_token")
-
-    if not access_token:
-        raise RuntimeError("No Supabase access token is available.")
-
-    client = create_client(
-        SUPABASE_URL,
-        SUPABASE_KEY,
-        options=ClientOptions(
-            auto_refresh_token=False,
-            persist_session=False,
-        ),
-    )
-
-    client.postgrest.auth(access_token)
-    return client
 
 
 # ── GRAPH FUNCTION ─────────────────────────────────────────
@@ -340,14 +335,14 @@ def myprogress():
     if not login_required():
         return redirect(url_for("login"))
 
-    restore_supabase_session()
-
     try:
-        sessions = get_user_sessions(session["user_id"])
+        db = get_user_supabase()
+        sessions = get_user_sessions(db, session["user_id"])
     except Exception as e:
         print(f"PROGRESS ERROR: {e}")
-        flash("Could not load progress history.")
-        sessions = []
+        flash("Your login session has expired. Please log in again.")
+        session.clear()
+        return redirect(url_for("login"))
 
     # Session numbers count up from the user's first-ever upload (oldest = 1),
     # so the number reflects their actual timeline regardless of how the
@@ -385,11 +380,10 @@ def view_session(session_id):
     if not login_required():
         return redirect(url_for("login"))
 
-    restore_supabase_session()
-
     try:
+        db = get_user_supabase()
         response = (
-            supabase.table("sessions")
+            db.table("sessions")
             .select("*")
             .eq("id", session_id)
             .eq("user_id", session["user_id"])  # ensure users can only view their own sessions
@@ -450,8 +444,6 @@ def upload():
     if not login_required():
         return redirect(url_for("login"))
 
-    restore_supabase_session()
-
     file = request.files.get("media")
 
     if not file or not file.filename:
@@ -501,9 +493,23 @@ def upload():
     # Rejects the upload before it ever reaches the expensive
     # MediaPipe pose-extraction step.
     if ext in VIDEO_EXTENSIONS:
-        passed, details = detect_racket(save_path)
+        try:
+            passed, details = detect_racket(save_path)
+        except Exception as e:
+            print(f"RACKET DETECTOR ERROR: {e}")
+            import traceback
+            traceback.print_exc()
+            try:
+                if os.path.exists(save_path):
+                    os.remove(save_path)
+            except OSError:
+                pass
+            flash("The video could not be checked for a tennis racket.")
+            return redirect(url_for("analyse", player=player_key))
+
         if not passed:
-            os.remove(save_path)
+            if os.path.exists(save_path):
+                os.remove(save_path)
             print(f"RACKET CHECK FAILED for {filename}: {details}")
             flash("We couldn't detect a tennis racket in your video. Please upload a video of your serve.")
             return redirect(url_for("analyse", player=player_key))
@@ -558,7 +564,9 @@ def upload():
     )
 
     try:
+        db = get_user_supabase()
         save_session(
+            db=db,
             user_id=session["user_id"],
             filename=filename,
             player_key=player_key,
@@ -603,11 +611,6 @@ def upload():
 
 @app.route("/logout")
 def logout():
-    try:
-        supabase.auth.sign_out()
-    except Exception:
-        pass
-
     session.clear()
     return redirect(url_for("login"))
 
