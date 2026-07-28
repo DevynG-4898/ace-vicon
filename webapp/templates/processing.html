@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ACE — Analysing Serve</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --green: #4ade80;
+            --green-dim: #22c55e;
+            --green-dark: #15803d;
+            --page: #080c10;
+            --panel: #0f1318;
+            --text: #f4f7f5;
+            --muted: #9ca8a1;
+            --line: rgba(255,255,255,.09);
+        }
+        * { box-sizing: border-box; }
+        html, body { min-height: 100%; margin: 0; }
+        body {
+            min-height: 100vh;
+            color: var(--text);
+            background:
+                radial-gradient(circle at 20% 15%, rgba(74,222,128,.11), transparent 28rem),
+                radial-gradient(circle at 85% 85%, rgba(34,197,94,.08), transparent 24rem),
+                var(--page);
+            font-family: "Barlow", sans-serif;
+        }
+        .page-shell { min-height: 100vh; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+        .court-lines { position: fixed; inset: 0; opacity: .13; pointer-events: none; }
+        .court-lines::before, .court-lines::after { content: ""; position: absolute; border: 1px solid var(--green); }
+        .court-lines::before { top: 14%; left: -8%; width: 58%; height: 68%; transform: skewX(-11deg); }
+        .court-lines::after { right: -12%; bottom: 6%; width: 50%; height: 54%; transform: skewX(10deg); }
+        .nav {
+            min-height: 76px; display: flex; align-items: center; justify-content: space-between;
+            padding: 0 6vw; border-bottom: 1px solid var(--line);
+            background: rgba(8,12,16,.76); backdrop-filter: blur(18px); position: relative; z-index: 2;
+        }
+        .brand { color: var(--text); font-family: "Anton", sans-serif; font-size: 2rem; letter-spacing: .075em; text-decoration: none; }
+        .brand span { color: var(--green); }
+        .nav-status { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: .82rem; font-weight: 600; letter-spacing: .13em; text-transform: uppercase; }
+        .status-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 5px rgba(74,222,128,.11); animation: pulse 1.8s ease-in-out infinite; }
+        main { flex: 1; display: grid; place-items: center; padding: 46px 22px; position: relative; z-index: 1; }
+        .processing-card {
+            width: min(720px,100%); padding: clamp(28px,5vw,52px); border: 1px solid var(--line); border-radius: 26px;
+            background: linear-gradient(145deg,rgba(255,255,255,.035),transparent 46%), rgba(15,19,24,.94);
+            box-shadow: 0 28px 80px rgba(0,0,0,.42); position: relative; overflow: hidden;
+        }
+        .processing-card::before { content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 3px; background: linear-gradient(90deg,transparent,var(--green),transparent); }
+        .eyebrow { margin: 0 0 14px; color: var(--green); font-size: .76rem; font-weight: 600; letter-spacing: .19em; text-transform: uppercase; }
+        h1 { margin: 0; font-family: "Anton", sans-serif; font-size: clamp(2.65rem,7vw,5.3rem); font-weight: 400; line-height: .98; text-transform: uppercase; }
+        h1 span { color: var(--green); }
+        .intro { max-width: 570px; margin: 18px 0 0; color: var(--muted); font-size: 1.08rem; line-height: 1.65; }
+        .loader-wrap { display: grid; grid-template-columns: auto 1fr; gap: 21px; align-items: center; margin-top: 38px; padding: 20px; border: 1px solid var(--line); border-radius: 18px; background: rgba(255,255,255,.025); }
+        .ball-loader { width: 58px; height: 58px; border-radius: 50%; background: #c9ff43; box-shadow: 0 0 0 7px rgba(74,222,128,.08), 0 0 28px rgba(74,222,128,.22); position: relative; animation: bounce 1.15s ease-in-out infinite; }
+        .ball-loader::before, .ball-loader::after { content: ""; position: absolute; top: 3px; width: 35px; height: 48px; border-radius: 50%; }
+        .ball-loader::before { left: -3px; border-right: 3px solid rgba(255,255,255,.88); }
+        .ball-loader::after { right: -3px; border-left: 3px solid rgba(255,255,255,.88); }
+        .stage-label { margin: 0 0 5px; color: var(--green); font-size: .74rem; font-weight: 600; letter-spacing: .15em; text-transform: uppercase; }
+        .stage-message { margin: 0; color: var(--text); font-size: 1.16rem; font-weight: 500; line-height: 1.35; }
+        .progress-section { margin-top: 29px; }
+        .progress-meta { display: flex; justify-content: space-between; margin-bottom: 10px; color: var(--muted); font-size: .82rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+        .progress-track { width: 100%; height: 13px; overflow: hidden; border: 1px solid rgba(255,255,255,.055); border-radius: 999px; background: #090d11; position: relative; }
+        .progress-bar { position: absolute; inset: 0 auto 0 0; width: 8%; border-radius: inherit; background: linear-gradient(90deg,var(--green-dark),var(--green),#b7ff4a); box-shadow: 0 0 24px rgba(74,222,128,.38); transition: width 1.2s ease; }
+        .progress-bar::after { content: ""; position: absolute; inset: 0; background: linear-gradient(105deg,transparent 0%,rgba(255,255,255,.38) 45%,transparent 65%); transform: translateX(-100%); animation: shine 1.65s linear infinite; }
+        .steps { display: grid; grid-template-columns: repeat(3,1fr); gap: 11px; margin-top: 24px; }
+        .step { min-height: 92px; padding: 15px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.018); transition: .35s ease; }
+        .step-number { display: block; margin-bottom: 8px; color: #69766f; font-family: "Anton", sans-serif; font-size: 1.1rem; letter-spacing: .08em; }
+        .step-text { color: #7f8b85; font-size: .86rem; font-weight: 500; line-height: 1.35; }
+        .step.active { transform: translateY(-2px); border-color: rgba(74,222,128,.55); background: rgba(74,222,128,.07); }
+        .step.active .step-number, .step.complete .step-number { color: var(--green); }
+        .step.active .step-text, .step.complete .step-text { color: var(--text); }
+        .step.complete { border-color: rgba(74,222,128,.22); }
+        .notice { display: flex; gap: 11px; margin: 25px 0 0; color: var(--muted); font-size: .91rem; line-height: 1.5; }
+        .notice-icon { display: grid; place-items: center; flex: 0 0 22px; width: 22px; height: 22px; border: 1px solid rgba(74,222,128,.35); border-radius: 50%; color: var(--green); font-size: .75rem; font-weight: 600; }
+        footer { padding: 0 22px 24px; color: #657069; font-size: .78rem; letter-spacing: .08em; text-align: center; text-transform: uppercase; position: relative; z-index: 1; }
+        @keyframes pulse { 0%,100% { opacity:.55; transform:scale(.9); } 50% { opacity:1; transform:scale(1.08); } }
+        @keyframes bounce { 0%,100% { transform:translateY(4px) rotate(-8deg); } 50% { transform:translateY(-7px) rotate(12deg); } }
+        @keyframes shine { to { transform:translateX(100%); } }
+        @media (max-width:680px) {
+            .nav { min-height: 66px; padding: 0 20px; }
+            .brand { font-size: 1.65rem; }
+            .nav-status { font-size: 0; }
+            .nav-status::after { content: "Processing"; font-size: .72rem; }
+            main { padding: 28px 14px; }
+            .processing-card { padding: 28px 20px; border-radius: 20px; }
+            .loader-wrap { grid-template-columns: 1fr; justify-items: center; text-align: center; }
+            .steps { grid-template-columns: 1fr; }
+            .step { min-height: auto; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            *,*::before,*::after { animation-duration:.01ms!important; animation-iteration-count:1!important; transition-duration:.01ms!important; }
+        }
+    </style>
+</head>
+<body>
+<div class="page-shell">
+    <div class="court-lines" aria-hidden="true"></div>
+    <nav class="nav">
+        <a class="brand" href="{{ url_for('home') }}">ACE<span>.</span></a>
+        <div class="nav-status"><span class="status-dot" aria-hidden="true"></span>Analysis in progress</div>
+    </nav>
+
+    <main>
+        <section class="processing-card" aria-live="polite">
+            <p class="eyebrow">ACE motion analysis</p>
+            <h1>Building your <span>serve report.</span></h1>
+            <p class="intro">We are mapping your movement, identifying key serve positions, and comparing them with {{ player_name|default("your selected player") }}.</p>
+
+            <div class="loader-wrap">
+                <div class="ball-loader" aria-hidden="true"></div>
+                <div>
+                    <p id="stage-label" class="stage-label">Stage 1 of 6</p>
+                    <p id="stage-message" class="stage-message">Preparing your uploaded video...</p>
+                </div>
+            </div>
+
+            <div class="progress-section">
+                <div class="progress-meta"><span>Serve analysis</span><span id="progress-percent">8%</span></div>
+                <div class="progress-track" role="progressbar" aria-label="Video-analysis progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="8">
+                    <div id="progress-bar" class="progress-bar"></div>
+                </div>
+            </div>
+
+            <div class="steps" aria-label="Analysis stages">
+                <div class="step active"><span class="step-number">01</span><span class="step-text">Prepare video</span></div>
+                <div class="step"><span class="step-number">02</span><span class="step-text">Confirm racket</span></div>
+                <div class="step"><span class="step-number">03</span><span class="step-text">Track body motion</span></div>
+                <div class="step"><span class="step-number">04</span><span class="step-text">Identify serve phases</span></div>
+                <div class="step"><span class="step-number">05</span><span class="step-text">Compare technique</span></div>
+                <div class="step"><span class="step-number">06</span><span class="step-text">Create feedback</span></div>
+            </div>
+
+            <p class="notice"><span class="notice-icon" aria-hidden="true">i</span><span>Processing can take several minutes depending on video length. Keep this page open while ACE completes your report.</span></p>
+        </section>
+    </main>
+
+    <footer>ACE Tennis Analysis</footer>
+</div>
+
+<script>
+    const stages = [
+        { label: "Stage 1 of 6", message: "Preparing your uploaded video...", percent: 8, delay: 0 },
+        { label: "Stage 2 of 6", message: "Checking for a visible tennis racket...", percent: 22, delay: 2500 },
+        { label: "Stage 3 of 6", message: "Tracking your body position and movement...", percent: 43, delay: 7500 },
+        { label: "Stage 4 of 6", message: "Identifying the important phases of your serve...", percent: 64, delay: 18000 },
+        { label: "Stage 5 of 6", message: "Comparing your technique with the reference player...", percent: 82, delay: 32000 },
+        { label: "Stage 6 of 6", message: "Creating your score and coaching feedback...", percent: 94, delay: 48000 }
+    ];
+
+    const bar = document.getElementById("progress-bar");
+    const percentText = document.getElementById("progress-percent");
+    const stageLabel = document.getElementById("stage-label");
+    const stageMessage = document.getElementById("stage-message");
+    const progressTrack = document.querySelector(".progress-track");
+    const stepElements = Array.from(document.querySelectorAll(".step"));
+
+    function showStage(index) {
+        const stage = stages[index];
+        stageLabel.textContent = stage.label;
+        stageMessage.textContent = stage.message;
+        percentText.textContent = stage.percent + "%";
+        bar.style.width = stage.percent + "%";
+        progressTrack.setAttribute("aria-valuenow", String(stage.percent));
+        stepElements.forEach((step, stepIndex) => {
+            step.classList.toggle("active", stepIndex === index);
+            step.classList.toggle("complete", stepIndex < index);
+        });
+    }
+
+    stages.forEach((stage, index) => window.setTimeout(() => showStage(index), stage.delay));
+</script>
+</body>
+</html>
