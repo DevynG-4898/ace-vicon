@@ -1,6 +1,5 @@
 import sys
 import os
-import uuid
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _REPO_ROOT)
@@ -58,7 +57,7 @@ CSV_EXTENSIONS = {".csv"}
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
 
 # ── PLAYERS ─────────────────────────────────────────────
-# Each player has their own reference_files list, so /analyze and /upload
+# Each player has their own reference_files list, so /analyse and /upload
 # stay in sync automatically off this one dict.
 # Placeholder players (rybakina, sabalenka, roddick) currently point at
 # Max's CSVs until real reference data is added — swap reference_files
@@ -312,8 +311,8 @@ def home():
     return render_template("index.html", user=session["user"], players=PLAYERS)
 
 
-@app.route("/analyze")
-def analyze():
+@app.route("/analyse")
+def analyse():
     if not login_required():
         return redirect(url_for("login"))
 
@@ -323,7 +322,7 @@ def analyze():
     selected_player = PLAYERS[player_key]
 
     return render_template(
-        "analyze.html",
+        "analyse.html",
         user=session["user"],
         players=PLAYERS,
         selected_player_key=player_key,
@@ -442,12 +441,6 @@ def make_json_safe(value):
 
 @app.route("/upload", methods=["POST"])
 def upload():
-    """
-    Validate and save the upload, then redirect immediately to processing.html.
-
-    The expensive analysis is intentionally performed later by /process-upload
-    so the browser can display the processing page while the request runs.
-    """
     if not login_required():
         return redirect(url_for("login"))
 
@@ -455,37 +448,37 @@ def upload():
 
     if not file or not file.filename:
         flash("No file uploaded.")
-        return redirect(url_for("analyze"))
+        return redirect(url_for("analyse"))
 
-    original_filename = secure_filename(file.filename)
+    filename = secure_filename(file.filename)
 
-    if not original_filename:
+    if not filename:
         flash("Invalid filename.")
-        return redirect(url_for("analyze"))
+        return redirect(url_for("analyse"))
 
-    ext = os.path.splitext(original_filename)[1].lower()
+    ext = os.path.splitext(filename)[1].lower()
 
     if ext not in CSV_EXTENSIONS and ext not in VIDEO_EXTENSIONS:
         flash(
             "Please upload a CSV or video file "
             "(.csv, .mp4, .mov, .avi, .mkv, .webm)."
         )
-        return redirect(url_for("analyze"))
+        return redirect(url_for("analyse"))
 
     player_key = request.form.get("player_key", DEFAULT_PLAYER)
 
     if player_key not in PLAYERS:
         player_key = DEFAULT_PLAYER
 
-    # A unique server filename prevents users who upload files with the same
-    # name from overwriting one another.
-    stored_filename = f"{uuid.uuid4().hex}_{original_filename}"
-    save_path = os.path.join(app.config["UPLOAD_FOLDER"], stored_filename)
+    player = PLAYERS[player_key]
+
+    save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
 
     try:
         file.save(save_path)
         print(f"UPLOAD SAVED: {save_path}")
         print(f"UPLOAD SIZE: {os.path.getsize(save_path)} bytes")
+
     except Exception as e:
         print(f"FILE SAVE ERROR: {e}")
 
@@ -493,108 +486,35 @@ def upload():
         traceback.print_exc()
 
         flash("The uploaded file could not be saved.")
-        return redirect(url_for("analyze", player=player_key))
+        return redirect(url_for("analyse", player=player_key))
 
-    # Flask's default session is stored in a signed browser cookie, so retain
-    # only small strings here—not the video bytes or analysis result.
-    session["pending_upload"] = {
-        "path": save_path,
-        "filename": original_filename,
-        "extension": ext,
-        "player_key": player_key,
-    }
+    # ── RACKET RELEVANCE CHECK (video uploads only) ─────────
+    # CSV files have no visual content, so this only applies to videos.
+    # Rejects the upload before it ever reaches the expensive
+    # MediaPipe pose-extraction step.
+    if ext in VIDEO_EXTENSIONS:
+        try:
+            passed, details = detect_racket(save_path)
+        except Exception as e:
+            print(f"RACKET DETECTOR ERROR: {e}")
+            import traceback
+            traceback.print_exc()
+            try:
+                if os.path.exists(save_path):
+                    os.remove(save_path)
+            except OSError:
+                pass
+            flash("The video could not be checked for a tennis racket.")
+            return redirect(url_for("analyse", player=player_key))
 
-    return redirect(url_for("processing"))
-
-
-@app.route("/processing")
-def processing():
-    """Display the loading page for the upload waiting to be analyzed."""
-    if not login_required():
-        return redirect(url_for("login"))
-
-    pending = session.get("pending_upload")
-
-    if not pending:
-        flash("There is no upload waiting to be processed.")
-        return redirect(url_for("analyze"))
-
-    player_key = pending.get("player_key", DEFAULT_PLAYER)
-
-    if player_key not in PLAYERS:
-        player_key = DEFAULT_PLAYER
-
-    player = PLAYERS[player_key]
-
-    return render_template(
-        "processing.html",
-        user=session["user"],
-        filename=pending.get("filename"),
-        player_name=player["name"],
-        player=player,
-    )
-
-
-@app.route("/process-upload", methods=["POST"])
-def process_upload():
-    """
-    Run the long video/CSV analysis request started by processing.html.
-
-    Returns JSON containing the page that the browser should open after the
-    analysis succeeds or fails.
-    """
-    if not login_required():
-        return {
-            "success": False,
-            "redirect": url_for("login"),
-            "error": "Your login session has expired. Please log in again.",
-        }, 401
-
-    pending = session.get("pending_upload")
-
-    if not pending:
-        return {
-            "success": False,
-            "redirect": url_for("analyze"),
-            "error": "No pending upload was found.",
-        }, 400
-
-    save_path = pending.get("path")
-    filename = pending.get("filename")
-    ext = pending.get("extension")
-    player_key = pending.get("player_key", DEFAULT_PLAYER)
-
-    if player_key not in PLAYERS:
-        player_key = DEFAULT_PLAYER
-
-    player = PLAYERS[player_key]
-
-    if not save_path or not os.path.isfile(save_path):
-        session.pop("pending_upload", None)
-        return {
-            "success": False,
-            "redirect": url_for("analyze", player=player_key),
-            "error": "The uploaded file could not be found on the server.",
-        }, 404
+        if not passed:
+            if os.path.exists(save_path):
+                os.remove(save_path)
+            print(f"RACKET CHECK FAILED for {filename}: {details}")
+            flash("We couldn't detect a tennis racket in your video. Please upload a video of your serve.")
+            return redirect(url_for("analyse", player=player_key))
 
     try:
-        # ── RACKET RELEVANCE CHECK (video uploads only) ──────
-        if ext in VIDEO_EXTENSIONS:
-            print("STARTING RACKET CHECK")
-            passed, details = detect_racket(save_path)
-
-            if not passed:
-                print(f"RACKET CHECK FAILED for {filename}: {details}")
-                return {
-                    "success": False,
-                    "redirect": url_for("analyze", player=player_key),
-                    "error": (
-                        "We couldn't detect a tennis racket in your video. "
-                        "Please upload a clear video of your serve."
-                    ),
-                }, 400
-
-        # ── MAIN VIDEO / CSV PIPELINE ─────────────────────────
         if ext in VIDEO_EXTENSIONS:
             print("STARTING VIDEO PIPELINE")
 
@@ -614,17 +534,10 @@ def process_upload():
 
             grade_results = pipeline_result.snapshot_grade
             coaching_report = pipeline_result.coaching_report
-
-            overall_score = grade_results.get("overall_score")
-            if overall_score is None:
-                raise ValueError(
-                    "The analysis completed without a comparable overall score."
-                )
-
-            score = float(overall_score)
+            score = float(grade_results["overall_score"])
             plot_path = None
 
-        elif ext in CSV_EXTENSIONS:
+        else:
             score, avg_z, ref_mean, user_traj = compute_similarity_from_csv(
                 save_path,
                 player["reference_files"],
@@ -635,19 +548,24 @@ def process_upload():
             grade_results = None
             coaching_report = None
 
-        else:
-            raise ValueError("The pending upload has an unsupported file type.")
+    except Exception as e:
+        print(f"UPLOAD PROCESSING ERROR: {e}")
 
-        coaching_report_data = (
-            coaching_report.to_dict()
-            if coaching_report and hasattr(coaching_report, "to_dict")
-            else coaching_report
-        )
+        import traceback
+        traceback.print_exc()
 
-        # ── SAVE THE COMPLETED REPORT TO SUPABASE ─────────────
+        flash(f"Error processing file: {e}")
+        return redirect(url_for("analyse", player=player_key))
+
+    coaching_report_data = (
+        coaching_report.to_dict()
+        if coaching_report and hasattr(coaching_report, "to_dict")
+        else coaching_report
+    )
+
+    try:
         db = get_user_supabase()
-
-        saved_rows = save_session(
+        save_session(
             db=db,
             user_id=session["user_id"],
             filename=filename,
@@ -662,41 +580,33 @@ def process_upload():
             },
         )
 
-        if not saved_rows or not saved_rows[0].get("id"):
-            raise RuntimeError(
-                "Supabase did not return the saved analysis session ID."
-            )
-
-        session_id = saved_rows[0]["id"]
-
-        return {
-            "success": True,
-            "redirect": url_for(
-                "view_session",
-                session_id=session_id,
-            ),
-        }
-
     except Exception as e:
-        print(f"UPLOAD PROCESSING ERROR: {e}")
+        print(f"SAVE SESSION ERROR: {e}")
 
         import traceback
         traceback.print_exc()
 
-        return {
-            "success": False,
-            "redirect": url_for("analyze", player=player_key),
-            "error": f"Error processing file: {e}",
-        }, 500
+        flash("Analysis completed, but progress history could not be saved.")
 
     finally:
         try:
-            if save_path and os.path.exists(save_path):
+            if os.path.exists(save_path):
                 os.remove(save_path)
         except Exception as cleanup_error:
             print(f"UPLOAD CLEANUP ERROR: {cleanup_error}")
 
-        session.pop("pending_upload", None)
+    return render_template(
+        "result.html",
+        user=session["user"],
+        filename=filename,
+        player=player,
+        score=score,
+        plot_path=plot_path,
+        grade_results=grade_results,
+        coaching_report=coaching_report_data,
+        SNAPSHOT_WEIGHTS=SNAPSHOT_WEIGHTS,
+        SNAPSHOT_NAMES=SNAPSHOT_NAMES,
+    )
 
 
 @app.route("/logout")
