@@ -240,7 +240,7 @@
     <a href="{{ url_for('home') }}" class="nav-logo"><span class="t">ACE</span></a>
     <div class="nav-links">
       <a href="{{ url_for('home') }}">Home</a>
-      <a href="{{ url_for('analyse') }}">Analyze</a>
+      <a href="{{ url_for('analyze') }}">Analyze</a>
       <a href="{{ url_for('myprogress') }}">My Progress</a>
       <a href="{{ url_for('logout') }}" class="logout">Logout</a>
     </div>
@@ -286,7 +286,7 @@
         <div class="phase-note-body">
           <span>{{ w.summary }}</span>
           {% if w.suggest_reupload %}
-          <a href="{{ url_for('analyse') }}" class="phase-note-link">Upload another clip →</a>
+          <a href="{{ url_for('analyze') }}" class="phase-note-link">Upload another clip →</a>
           {% endif %}
         </div>
       </div>
@@ -386,7 +386,7 @@
 
   <!-- PINNED ACTIONS -->
   <div class="action-bar">
-    <a href="{{ url_for('analyse') }}" class="primary">ANALYZE ANOTHER</a>
+    <a href="{{ url_for('analyze') }}" class="primary">ANALYZE ANOTHER</a>
     <a href="{{ url_for('myprogress') }}" class="secondary">MY PROGRESS</a>
   </div>
 

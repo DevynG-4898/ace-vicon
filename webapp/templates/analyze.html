@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Analyse — ACE</title>
+    <title>Analyze — ACE</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link
       href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow:wght@400;500;600&display=swap"
@@ -319,7 +319,7 @@
       </a>
       <div class="nav-links">
         <a href="{{ url_for('home') }}">Home</a>
-        <a href="{{ url_for('analyse') }}" class="active">Analyze</a>
+        <a href="{{ url_for('analyze') }}" class="active">Analyze</a>
         <a href="{{ url_for('myprogress') }}">My Progress</a>
         <a href="{{ url_for('logout') }}" class="logout">Logout</a>
       </div>
@@ -450,7 +450,7 @@
         if (fileInput.files[0]) {
           selectedName.textContent = "✓ " + fileInput.files[0].name;
           submitBtn.disabled = false;
-          submitBtn.textContent = "ANALYSE MY SERVE →";
+          submitBtn.textContent = "ANALYZE MY SERVE →";
         }
       });
     </script>

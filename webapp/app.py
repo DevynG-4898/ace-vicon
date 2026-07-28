@@ -57,7 +57,7 @@ CSV_EXTENSIONS = {".csv"}
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
 
 # ── PLAYERS ─────────────────────────────────────────────
-# Each player has their own reference_files list, so /analyse and /upload
+# Each player has their own reference_files list, so /analyze and /upload
 # stay in sync automatically off this one dict.
 # Placeholder players (rybakina, sabalenka, roddick) currently point at
 # Max's CSVs until real reference data is added — swap reference_files
@@ -311,8 +311,8 @@ def home():
     return render_template("index.html", user=session["user"], players=PLAYERS)
 
 
-@app.route("/analyse")
-def analyse():
+@app.route("/analyze")
+def analyze():
     if not login_required():
         return redirect(url_for("login"))
 
@@ -322,7 +322,7 @@ def analyse():
     selected_player = PLAYERS[player_key]
 
     return render_template(
-        "analyse.html",
+        "analyze.html",
         user=session["user"],
         players=PLAYERS,
         selected_player_key=player_key,
@@ -448,13 +448,13 @@ def upload():
 
     if not file or not file.filename:
         flash("No file uploaded.")
-        return redirect(url_for("analyse"))
+        return redirect(url_for("analyze"))
 
     filename = secure_filename(file.filename)
 
     if not filename:
         flash("Invalid filename.")
-        return redirect(url_for("analyse"))
+        return redirect(url_for("analyze"))
 
     ext = os.path.splitext(filename)[1].lower()
 
@@ -463,7 +463,7 @@ def upload():
             "Please upload a CSV or video file "
             "(.csv, .mp4, .mov, .avi, .mkv, .webm)."
         )
-        return redirect(url_for("analyse"))
+        return redirect(url_for("analyze"))
 
     player_key = request.form.get("player_key", DEFAULT_PLAYER)
 
@@ -486,7 +486,7 @@ def upload():
         traceback.print_exc()
 
         flash("The uploaded file could not be saved.")
-        return redirect(url_for("analyse", player=player_key))
+        return redirect(url_for("analyze", player=player_key))
 
     # ── RACKET RELEVANCE CHECK (video uploads only) ─────────
     # CSV files have no visual content, so this only applies to videos.
@@ -512,7 +512,7 @@ def upload():
                 os.remove(save_path)
             print(f"RACKET CHECK FAILED for {filename}: {details}")
             flash("We couldn't detect a tennis racket in your video. Please upload a video of your serve.")
-            return redirect(url_for("analyse", player=player_key))
+            return redirect(url_for("analyze", player=player_key))
 
     try:
         if ext in VIDEO_EXTENSIONS:
@@ -555,7 +555,7 @@ def upload():
         traceback.print_exc()
 
         flash(f"Error processing file: {e}")
-        return redirect(url_for("analyse", player=player_key))
+        return redirect(url_for("analyze", player=player_key))
 
     coaching_report_data = (
         coaching_report.to_dict()
