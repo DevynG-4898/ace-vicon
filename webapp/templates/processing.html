@@ -158,6 +158,8 @@
     const progressTrack = document.querySelector(".progress-track");
     const stepElements = Array.from(document.querySelectorAll(".step"));
 
+    let processingStarted = false;
+
     function showStage(index) {
         const stage = stages[index];
         stageLabel.textContent = stage.label;
@@ -165,13 +167,94 @@
         percentText.textContent = stage.percent + "%";
         bar.style.width = stage.percent + "%";
         progressTrack.setAttribute("aria-valuenow", String(stage.percent));
-        stepElements.forEach((step, stepIndex) => {
+
+        stepElements.forEach(function (step, stepIndex) {
             step.classList.toggle("active", stepIndex === index);
             step.classList.toggle("complete", stepIndex < index);
         });
     }
 
-    stages.forEach((stage, index) => window.setTimeout(() => showStage(index), stage.delay));
+    function showError(message) {
+        stageLabel.textContent = "Analysis stopped";
+        stageMessage.textContent = message;
+        percentText.textContent = "Error";
+        console.error("PROCESSING ERROR:", message);
+    }
+
+    async function beginAnalysis() {
+        if (processingStarted) {
+            return;
+        }
+
+        processingStarted = true;
+        console.log("Calling /process-upload...");
+
+        try {
+            const response = await fetch(
+                "{{ url_for('process_upload') }}",
+                {
+                    method: "POST",
+                    credentials: "same-origin",
+                    headers: {
+                        "Accept": "application/json",
+                        "X-Requested-With": "XMLHttpRequest"
+                    }
+                }
+            );
+
+            const responseText = await response.text();
+            let data;
+
+            try {
+                data = JSON.parse(responseText);
+            } catch (parseError) {
+                console.error("Non-JSON response:", responseText);
+                throw new Error("The server returned an unexpected response.");
+            }
+
+            if (!response.ok || !data.success) {
+                const message = data.error || "The video could not be processed.";
+                showError(message);
+
+                window.setTimeout(function () {
+                    window.location.href = data.redirect || "{{ url_for('analyze') }}";
+                }, 2500);
+                return;
+            }
+
+            stageLabel.textContent = "Analysis complete";
+            stageMessage.textContent = "Your coaching report is ready.";
+            percentText.textContent = "100%";
+            bar.style.width = "100%";
+            progressTrack.setAttribute("aria-valuenow", "100");
+
+            stepElements.forEach(function (step) {
+                step.classList.remove("active");
+                step.classList.add("complete");
+            });
+
+            window.setTimeout(function () {
+                window.location.href = data.redirect;
+            }, 800);
+        } catch (error) {
+            console.error("PROCESS-UPLOAD REQUEST FAILED:", error);
+            showError("The connection to the analysis server was interrupted.");
+
+            window.setTimeout(function () {
+                window.location.href = "{{ url_for('analyze') }}";
+            }, 3000);
+        }
+    }
+
+    stages.forEach(function (stage, index) {
+        window.setTimeout(function () {
+            showStage(index);
+        }, stage.delay);
+    });
+
+    window.addEventListener("load", function () {
+        window.setTimeout(beginAnalysis, 500);
+    });
 </script>
 </body>
 </html>
