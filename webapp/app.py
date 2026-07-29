@@ -57,7 +57,7 @@ CSV_EXTENSIONS = {".csv"}
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
 
 # ── PLAYERS ─────────────────────────────────────────────
-# Each player has their own reference_files list, so /analyse and /upload
+# Each player has their own reference_files list, so /analyze and /upload
 # stay in sync automatically off this one dict.
 # Placeholder players (rybakina, sabalenka, roddick) currently point at
 # Max's CSVs until real reference data is added — swap reference_files
@@ -505,7 +505,7 @@ def upload():
             except OSError:
                 pass
             flash("The video could not be checked for a tennis racket.")
-            return redirect(url_for("analyze", player=player_key))
+            return redirect(url_for("analyse", player=player_key))
 
         if not passed:
             if os.path.exists(save_path):
