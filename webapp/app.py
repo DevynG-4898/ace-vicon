@@ -65,11 +65,11 @@ VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
 
 PLAYERS = {
     "rybakina": {
-        "name": "Rybakina",
-        "style": "Power Serve",
-        "avatar": "player6.png",
+        "name": "Max",
+        "style": "Flat Serve",
+        "avatar": "player7.png",
         "reference_files": [
-            os.path.join(BASE_DIR, "reference_players/rybakina_formatted.csv")
+            os.path.join(BASE_DIR, "reference_players/max_formatted.csv")
         ],
         "tips": [
             "Reference data coming soon — currently using placeholder motion data.",

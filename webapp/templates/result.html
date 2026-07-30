@@ -225,7 +225,7 @@
     .reco-correction { font-size: 0.88rem; color: var(--text); margin-bottom: 0.6rem; }
     .reco-sublist { margin-top: 0.5rem; }
     .reco-subhead { font-size: 0.72rem; letter-spacing: 0.5px; color: var(--muted); text-transform: uppercase; margin-bottom: 0.25rem; }
-    .reco-item { font-size: 0.82rem; color: rgba(240,242,245,0.75); padding: 0.12rem 0; line-height: 1.5; }
+    .reco-item { font-size: 0.82rem; color: rgba(239, 245, 255, 0.75); padding: 0.12rem 0; line-height: 1.5; }
     .reco-strengths { margin-top: 0.5rem; }
     .reco-warnings { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border); }
     .reco-warning-item { font-size: 0.8rem; color: var(--amber); padding: 0.15rem 0; }
@@ -311,9 +311,9 @@
 
         {% if rec.coach_quotes %}
         <div class="reco-sublist">
-          <p class="reco-subhead">Coach Quotes</p>
+          <p class="reco-subhead">Coach Suggestions</p>
           {% for q in rec.coach_quotes %}
-          <p class="reco-item">“{{ q }}”</p>
+          <p class="reco-item">{{ q }}</p>
           {% endfor %}
         </div>
         {% endif %}
@@ -340,9 +340,9 @@
 
         {% if rec.coach_quotes %}
         <div class="reco-sublist">
-          <p class="reco-subhead">Coach Quotes</p>
+          <p class="reco-subhead">Coach Suggestions</p>
           {% for q in rec.coach_quotes %}
-          <p class="reco-item">“{{ q }}”</p>
+          <p class="reco-item">{{ q }}</p>
           {% endfor %}
         </div>
         {% endif %}
