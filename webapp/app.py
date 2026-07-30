@@ -310,6 +310,11 @@ def home():
         return redirect(url_for("login"))
     return render_template("index.html", user=session["user"], players=PLAYERS)
 
+@app.route("/about")
+def about():
+    if not login_required():
+        return redirect(url_for("login"))
+    return render_template("about.html", user=session["user"])
 
 @app.route("/analyze")
 def analyze():

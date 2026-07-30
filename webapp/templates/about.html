@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About — ACE</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --green: #4ADE80;
+      --green-dim: #22c55e;
+      --bg: #080c10;
+      --surface: #0f1318;
+      --border: #1e2530;
+      --text: #f0f2f5;
+      --muted: #5a6470;
+    }
+    body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+      height: 60px; display: flex; align-items: center;
+      justify-content: space-between; padding: 0 2.5rem;
+      background: rgba(8,12,16,0.88); backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .nav-logo { font-family: 'Anton', sans-serif; font-size: 1.5rem; letter-spacing: 3px; text-decoration: none; }
+    .nav-logo .t { color: var(--green); }
+
+    .nav-links { display: flex; align-items: center; gap: 0.2rem; }
+    .nav-links a {
+      color: var(--muted); text-decoration: none; font-size: 0.875rem;
+      font-weight: 600; padding: 0.4rem 0.9rem; border-radius: 6px; transition: all 0.2s;
+    }
+    .nav-links a:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+    .nav-links a.active { color: var(--green); }
+    .nav-links a.logout { color: #f87171; }
+
+    .content {
+      max-width: 800px; margin: 0 auto;
+      padding: 8rem 2rem 5rem;
+    }
+    .section-label {
+      font-family: 'Anton', sans-serif; font-size: 0.65rem; letter-spacing: 5px;
+      color: var(--green); text-transform: uppercase; margin-bottom: 1rem;
+    }
+    .content h1 {
+      font-family: 'Anton', sans-serif;
+      font-size: clamp(2.4rem, 5vw, 3.5rem);
+      letter-spacing: 2px; color: #fff; margin-bottom: 1.5rem;
+    }
+    .content p {
+      font-size: 1rem; line-height: 1.75; color: rgba(255,255,255,0.65);
+      margin-bottom: 1.25rem;
+    }
+    .content strong { color: rgba(255,255,255,0.9); font-weight: 600; }
+
+    .team-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1.5rem; margin-top: 2.5rem;
+    }
+    .team-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 1.25rem;
+    }
+    .team-card h3 {
+      font-family: 'Anton', sans-serif; font-size: 0.95rem;
+      letter-spacing: 1px; color: #fff; margin-bottom: 0.35rem;
+    }
+    .team-card p { font-size: 0.8rem; color: var(--muted); margin: 0; }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <a href="{{ url_for('home') }}" class="nav-logo"><span class="t">ACE</span></a>
+    <div class="nav-links">
+      <a href="{{ url_for('home') }}">Home</a>
+      <a href="{{ url_for('analyze') }}">Analyze</a>
+      <a href="{{ url_for('myprogress') }}">My Progress</a>
+      <a href="{{ url_for('about') }}" class="active">About</a>
+      <a href="{{ url_for('logout') }}" class="logout">Logout</a>
+    </div>
+  </nav>
+
+  <div class="content">
+    <div class="section-label">About ACE</div>
+    <h1>AI-POWERED SERVE ANALYSIS.</h1>
+    <p>
+      ACE is a tennis serve motion-analysis system built to give players
+      <strong>professional-level feedback</strong> on their serve mechanics.
+      By comparing your motion against pro reference data, ACE breaks your
+      serve down phase-by-phase — from your starting stance to contact to
+      follow-through — and shows you exactly where to improve.
+    </p>
+    <p>
+      Upload a video of your serve in the analyze section, and submit your video . 
+      after let our feedback give you tips on how to improve your serve!
+    </p>
+  </div>
+
+</body>
+</html>
+</body>
+</html>
