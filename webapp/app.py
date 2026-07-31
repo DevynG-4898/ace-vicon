@@ -312,8 +312,7 @@ def home():
 
 @app.route("/about")
 def about():
-   
-    return render_template("about.html", user=session["user"])
+    return render_template("about.html")
 
 @app.route("/analyze")
 def analyze():
